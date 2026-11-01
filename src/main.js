@@ -218,11 +218,15 @@ async function boot() {
     const plan = dailyPlan(day);
     return { day, name: night.name, night: night.id, twist: TWISTS[plan.twist].name, tip: TWISTS[plan.twist].tip, best: progress.daily.day === day ? progress.daily.raid : 0, top: raidBoard.day === day ? raidBoard.top : [], raiders: raidBoard.raiders };
   }
-  const twistText = (night) => (night?.twist && TWISTS[night.twist] ? `${TWISTS[night.twist].name} · ${TWISTS[night.twist].tip}` : '');
+  function twistText(night) {
+    return night?.twist && TWISTS[night.twist] ? `${TWISTS[night.twist].name} · ${TWISTS[night.twist].tip}` : '';
+  }
   function goalsView(now = []) {
     return progress.daily.day === today() ? progress.daily.goals.map((g) => ({ label: goalLabel(g.id), have: g.have, need: g.need, done: g.done, now: now.includes(g.id) })) : [];
   }
-  const weekView = (now = false) => (progress.weekly.id ? { label: goalLabel(progress.weekly.id), have: progress.weekly.have, need: progress.weekly.need, done: progress.weekly.done, now, week: true } : null);
+  function weekView(now = false) {
+    return progress.weekly.id ? { label: goalLabel(progress.weekly.id), have: progress.weekly.have, need: progress.weekly.need, done: progress.weekly.done, now, week: true } : null;
+  }
   function refreshTitle() {
     ensureDay(progress, today());
     readRaidBoard();
