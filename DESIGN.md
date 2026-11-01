@@ -292,20 +292,29 @@ corners) and keeps the top centre clear for the platform's notes.
 
 - **Title.** The attract world full screen (the Kitchen, autopilot mice, the wife's lantern, rings every few seconds). The
   name in the middle-top third, three lines on a phone held upright, one line on a wide screen; under it the **Play**
-  button (an amber outlined slab label, 64 px tall, a ring pulses from it every 2 s), and **★ 14** beside it once earned.
-  No tagline.
+  button (an amber outlined slab label, 64 px tall, a ring pulses from it every 2 s), the **level chip** (a mouse head,
+  "Lv 7", a bar to the next) and the **streak flame** with its count. Bottom right (bottom on a phone): the **Daily Raid**
+  card (today's night, its twist, the top three today or how many raided, your best, a yellow **Raid** button) and
+  **Today**: the three goals with their bars, then **This week**. No tagline.
 - **Lobby.** Behind it, the picked night's room in 3D, slowly orbiting, with a ring sweeping it every 3 s (the first one
   the midnight chime from the hole). **The night strip** along the top: twelve numbered tiles with their stars, locked ones
   dim with a padlock; the host taps one to pick it (others see the pick). **The night card** (bottom right on wide screens,
   bottom on a phone): "Night 4", "The Cellar", what the night teaches in one line ("Traps go snap"), three stars, "Best
   1:12", and the big **Start** (host) or **Ready** (others) button, or "Waiting for Ann". **The party** (left on wide
   screens, a row above the card on a phone): three seats, each with the player's avatar head (or their seat's shape), name, the
-  seat's shape in its colour, a check when ready and a host marker; empty seats are dashed with **Invite**. Tapping your
-  own seat (or G) cycles your glasses.
-- **Intro.** "Night 4 · The Cellar" in big outlined slab letters lit by the midnight ring, over the reveal. 2.5 s.
+  seat's shape in its colour, a check when ready and a host marker; empty seats are dashed with **Invite**. The strip starts
+  with a **Daily** tile (the raid: the card then shows the twist and today's board); a picked night's card shows its best
+  score with the medal and the three medal marks. The level chip and your own seat open the **Wardrobe**: the camera drops
+  in close on your mouse, turning slowly, and a panel (right; the lower half on a phone) has four tabs (Hats, Glasses,
+  Fur, Sparkle), every item drawn, locked ones with their level; tapping a locked one tries it on (only on your screen).
+- **Intro.** "Night 4 · The Cellar" in big outlined slab letters lit by the midnight ring, over the reveal; a raid adds
+  its twist in orange ("Golden wedge · One wedge is gold: 1500"). 2.5 s.
 - **Play HUD.** Top right: the **night clock**, a crescent moon sinking along an amber arc toward a sunrise line, with the
   minutes left in big numerals beside it ("2:41"); under it the **tally**: an outlined wedge per wedge (and a round outline
-  for the wheel) that fills yellow as each gets home. Everything else is in the world: your tail (on your mouse), the squeak
+  for the wheel) that fills yellow as each gets home (a gold one for a golden wedge); under it the **score**, rolling up,
+  with the **chain** ring beside it ("×3", draining over 2.5 s, glowing at ×5), and a paw-print **Tiptoe** when you're
+  silent. Crumbs pop "+30" where they were eaten; calls across the top for the moments ("Close shave +100", "Spotted",
+  "Golden wedge", "Chain 10!"); "+500" over the hole as cheese gets home. Everything else is in the world: your tail (on your mouse), the squeak
   charge (a ring preview around your mouse), names above friends' mice (white with a dark outline), friends off screen as
   small arrows at the edge in their colour and shape. **The goal is always pointed to** when it's off screen: a yellow
   wedge arrow to the nearest loose cheese, and an amber arch arrow to the hole while you carry. Hints:
@@ -320,8 +329,12 @@ corners) and keeps the top centre clear for the platform's notes.
 - **Morning (2 s).** The sky outside the windows turns pink, the room fills with soft dawn light, the hunters stop, the
   camera dives into the hole.
 - **Results.** Inside the mousehole: a warm earthen burrow (a cotton-reel table, a thimble, a matchbox bed) with the mice,
-  in their glasses and tails or bandages, on the cheese that got home. **Morning** big. Three stars, each pinging in as a ring with its label (Cheese home, All the cheese, Every
-  tail). The night's time and best; for co-op, one row per mouse: name, wedges home, tail or bandage. Buttons: **Next night**
+  dressed, with tails or bandages, on the cheese that got home, framed beside the sheet. **Morning** big, three stars. The
+  **sheet** counts the score up line by line (Cheese 2/2, Crumbs 31/34 · chain 7, then the bonuses in green), the total
+  with **New best**, the **medal** popping in over a bar with its three marks (the mice hop), the **XP** bar filling and
+  rolling over levels, any **New** item with **Wear**, today's goals (the ones just done pulse), the week's goal, and on a
+  raid today's top five. For co-op, one row per mouse: name, home and crumbs, and a title (Cheese runner, Crumb hoover)
+  or Bandaged. Buttons: **Next night**
   (big, N or Enter), **Again** (R), **Map** (M); for non-hosts "Waiting for Ann". A dawn with nothing home says **Dawn** and
   "No cheese", with **Again** big.
 - **Pause (alone).** The night dims behind one solid midnight band across the middle: **Paused**, Resume (big), Restart
