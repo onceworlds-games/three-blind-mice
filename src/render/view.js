@@ -105,6 +105,7 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
     bigAt: -99,
     holdUntil: 0,
     slowUntil: 0,
+    catSeq: -1,
     slowFrom: 0,
     time: 0,
     danger: 0,
@@ -403,9 +404,11 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
       const back = d0 * Math.cos(pitch);
       const near = back - camH / Math.tan(pitch + aV);
       const far = pitch - aV > 0.05 ? camH / Math.tan(pitch - aV) - back : 99;
-      const fit = (t, lo, hi) => (lo > hi ? (lo + hi) / 2 : Math.max(lo, Math.min(hi, t)));
-      c.tx = fit(c.tx, halfX - 0.4, world.W + 0.4 - halfX);
-      c.tz = fit(c.tz, far - 0.6, world.D + 0.1 - near);
+      // A room smaller than the view: centred across; front to back, most of the spare goes beyond the back wall (which
+      // covers some, and the far floor is drawn smaller), so a tall phone isn't left with a band of dark at the bottom.
+      const fit = (t, lo, hi, k) => (lo > hi ? hi + (lo - hi) * k : Math.max(lo, Math.min(hi, t)));
+      c.tx = fit(c.tx, halfX - 0.4, world.W + 0.4 - halfX, 0.5);
+      c.tz = fit(c.tz, far - 0.6, world.D + 0.1 - near, 0.22);
     }
     // Punch-in: a quick zoom toward the action.
     span *= 1 - 0.3 * v.punch;
@@ -697,6 +700,16 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
       v.cat.root.visible = v.cat.contact.visible = !!h;
       if (h) {
         poseCat(v.cat, h, vm.now, dt, v.reduced, fx);
+        // Her landing shakes the floor; a near miss holds the frame like the knife does.
+        if (h.m === 'land' && h.ch && v.catSeq !== h.ch.seq) {
+          v.catSeq = h.ch.seq;
+          const near = f ? Math.hypot(h.ch.x - f.x, h.ch.z - f.z) : 9;
+          v.addTrauma(near < 3 ? 0.5 : 0.2);
+          if (near < 2.2) {
+            v.hitStop(near < 1.2 ? 100 : 60);
+            v.punchIn(0.5);
+          }
+        }
         if (f && (h.m === 'crouch' || h.m === 'leap')) danger = Math.max(danger, 1 - Math.hypot(h.x - f.x, h.z - f.z) / 8);
       } else {
         v.cat.strikeLine.visible = v.cat.strikeGlow.visible = false;

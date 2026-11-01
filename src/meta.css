@@ -620,6 +620,37 @@
   }
 }
 
+/* A short landscape phone: the level and the three seats fit under the nights. */
+@media (min-aspect-ratio: 1/1) and (max-height: 500px) {
+  #lobby .lobbylv {
+    top: calc(var(--top-l) + 76px);
+    min-height: 38px;
+  }
+  #lobby .party {
+    top: calc(var(--top-l) + 124px);
+    gap: 4px;
+  }
+  .seat {
+    min-height: 40px;
+    padding: 2px 10px 2px 2px;
+  }
+  .seat .av,
+  .seat .av img {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+  }
+  .seat .who {
+    font-size: 15px;
+  }
+  .seat .who b {
+    font-size: 16px;
+  }
+  .seat .who i {
+    font-size: 14px;
+  }
+}
+
 /* ------------------------------------------------------------ the HUD: score, chain, tiptoe, pops, calls */
 #hud .score {
   position: absolute;
@@ -1059,6 +1090,25 @@
   }
   #results .total .tv {
     font-size: 36px;
+  }
+  /* One row of buttons under the sheet. */
+  #results .btns {
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+  #results .btns .btn.quiet {
+    padding: 0 12px;
+    flex: none;
+  }
+  #results .btns .btn.big {
+    flex: 1;
+    min-width: 0;
+    font-size: 24px;
+    padding: 0 12px;
+    white-space: nowrap;
+  }
+  #results .btns .btn .key {
+    display: none;
   }
 }
 @media (min-aspect-ratio: 1/1) and (max-height: 500px) {

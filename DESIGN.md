@@ -374,20 +374,26 @@ weight, drawn as amber outlines lit by rings), **Barlow** 600/700 for names and 
 reveals the title's letters, the map, the stars on the results, every button press (a small ring from the tap), and wipes
 between screens. It is the screenshot people remember.
 
-**Lighting and camera:** perspective camera (FOV 34°) pitched 62° down, following your mouse with a soft look-ahead, the
-shorter side of the screen showing about 13 u (wide enough for a big squeak). A dim blue hemisphere and moon (directional,
-soft shadows on high) so the floor seams always faintly show; the lantern is a spot light from her hand, warm, flickering,
-with shadows (map 1024 on medium, 2048 on high, none on low) that are also the game's hiding places. ACES tone mapping,
-sRGB, exponential fog into midnight. Bloom on the rings, the lantern flame and the cheese on medium and high only.
+**Real props and materials:** 32 Poly Haven models (mousetrap, barrels, crates, baskets, jugs, pots, lanterns, the oil
+lamp, the grandfather and mantel clocks, broom, boots, croissant, apples, bowls, the cheese box, stools…) packed into one
+simplified `props.glb` and instanced; 21 Poly Haven texture sets (oak, worn and stone floors, tiles, plaster, planks,
+gingham, plaid, hessian, rug, cabinet, table and pine wood) as WebP colour/normal/roughness maps. Everything else (the
+mice, the wife's legs, the farmer's legs, the cat, the furniture shells) is modelled in code with the same materials.
+Every table and shelf is dressed (bowls, bread, candles, jars) so a squeak reveals a lived-in room, not boxes. Windows
+throw moonlight across the floor; the stove and lamps glow; the hole breathes warm light.
 
-**The reveal shader:** surfaces and edge lines read up to 12 live rings (centre, start time, size, speed), up to 10 glow
-sources (mice, hole, cheese) and the memory of finished rings; edges come from the night's static shapes merged into one
-fat-line mesh of screen-facing quads. Surfaces get a faint fill as the ring passes; edges flare cream at the front, settle to amber and fade.
+**Lighting and camera:** perspective camera (FOV 38°) pitched 56° down on a critically damped spring, following your mouse
+with a look-ahead, the shorter side of the screen showing about 9 u (wider while you carry, charge a big squeak, or a
+hunter is close, so both are in the picture). It never shows more of the dark outside than the room needs. A dim blue
+hemisphere and the moon so the floor seams always faintly show; the lantern is a flickering spot light with shadows that
+are the game's hiding places. After the scene: the echo outline pass (from depth), bloom on what glows (rings, flames,
+cheese, the cat's eyes), ACES tone mapping, then a grade with a cool shadow lift, a vignette and a little film grain. Low
+quality keeps the outlines and skips the rest.
 
-**Mice:** small grey-mauve velvet bodies, big round ears, round black sunglasses with a cream glint that sparkles when a ring
-passes, a knitted scarf in the player's colour, a long pink tail that sways (until it doesn't). Squash on start and stop,
-a little hop on pick-up. Rim-lit by their own whisker glow. **Butter the cat:** a ginger cat in the dark, only her
-green-gold eyes and her purr rings showing until a ring draws her. **The farmer:** big muddy boots and a torch beam.
+**Feel:** hit-stop on a knife or a pounce that just misses (a close shave), screen shake on every strike, a punch-in
+zoom on a close shave and on cheese home, slow motion on the last cheese home, pooled particles (dust skids, crumb puffs, glints,
+splinters), squash and stretch on every mouse move, the tail's verlet sway, and the HUD's pops and calls ("Close shave",
+"Chain 10!").
 
 **HUD language:** amber lines and slab numerals painted straight onto the night, no boxes; the moon and the tally are drawn
 like the world's own outlines.
@@ -408,11 +414,17 @@ Synthesized Web Audio; sound is the game.
 - **The cat:** purr, a yawn-meow when she wakes, a hiss and a thump on the pounce. **The farmer:** heavy boots, torch click.
 - **The house:** the clock's tick, its midnight DONG and hourly chimes (bells), the farmer's snore, wind at the windows,
   the barn's cow breathing.
-- **Cheese:** a nibble pop on pick-up; home, a warm music-box run and the tally's chime; the wheel's rumble.
+- **Cheese:** a nibble pop on pick-up; home, a warm music-box run and the tally's chime; the wheel's rumble; a golden
+  wedge's bell run.
+- **Crumbs:** a tiny crunch and a plink that climbs a pentatonic scale with the chain, an octave on top at ×3 and a bell at
+  ×5; a soft falling blip when the chain runs out. A close shave: a swish and a rising note.
+- **Results:** a tick per counted line, a two-note chime per bonus, a bell chord for the medal (higher and brighter for
+  silver and gold), an arpeggio and bell for each level up, a sparkle for an unlock, a three-note figure for a goal done.
 - **Music:** a music box playing *Three Blind Mice* (public domain) from a small step sequencer at 84 bpm. Menus: the
   whole tune, soft, with a plucked bass. Playing: sparse fragments over the clock's tick. Danger (a hunter within 6 u, or a
-  chase): the tune turns minor and slows, a low cello drone and a heartbeat that quickens. Morning: a fast bright run.
-  Quieter in menus.
+  chase): the tune turns minor and slows, a low cello drone and a heartbeat that quickens. The music builds with the
+  night (cheese home and time gone): a plucked bass joins, then a brushed shaker, then a high counter-line, and the
+  fragments come more often. Morning: a fast bright run. Quieter in menus.
 
 ## Store art and the trailer
 

@@ -100,6 +100,9 @@ export function createCat() {
   const body = mesh(BODY, mats.fur, 0, 0, 0, 1, 0.92, 0.92);
   torso.add(body);
   torso.add(mesh(SPH, mats.pale, 0.32, -0.12, 0, 0.36, 0.26, 0.3, false));
+  // Shape over the tube: shoulder blades, a fluffy chest, and haunches on the hips so she reads as a cat from above.
+  for (const side of [-1, 1]) torso.add(mesh(SPH, mats.fur, 0.4, 0.04, side * 0.16, 0.22, 0.27, 0.16));
+  torso.add(mesh(SPH, mats.pale, 0.56, -0.08, 0, 0.2, 0.25, 0.25, false));
   // Head on a neck.
   const neck = new THREE.Group();
   neck.position.set(0.62, 0.22, 0);
@@ -152,6 +155,7 @@ export function createCat() {
       hips.add(leg);
     }
     const len = front ? 0.5 : 0.62;
+    if (!front) hips.add(mesh(SPH, mats.fur, 0.02, -0.06, side * 0.18, 0.3, 0.3, 0.16));
     const upper = mesh(legGeo, mats.fur, 0, 0, 0, front ? 1 : 1.5, len, front ? 1 : 1.4);
     leg.add(upper);
     const paw = mesh(SPH_LO, mats.pale, 0.05, -len, 0, 0.12, 0.07, 0.1, false);

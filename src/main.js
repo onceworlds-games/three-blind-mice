@@ -572,6 +572,8 @@ async function boot() {
             view.project(hx, 0.6, hz, proj);
             if (proj.on) ui.pop(proj.x, proj.y, `+${pts}`, 'x5');
             view.punchIn(0.35);
+            // The last one home: the world slows for a breath before Morning.
+            if (session.data.it.every((x, k) => x.home || k === f.i)) view.slowMo(1.4);
           }
           if (f.mine) {
             award('cheese-thief');

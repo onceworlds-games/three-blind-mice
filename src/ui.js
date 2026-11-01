@@ -592,6 +592,11 @@ export function createUI(h) {
   const rBtns = el('div', 'btns', res);
   const timers = [];
   const later = (ms, fn) => timers.push(setTimeout(fn, h.reduced?.() ? Math.min(ms, 60) : ms));
+  // A sheet taller than the screen follows what it is showing: each new part scrolls into view, never past the score.
+  const reveal = (elm) => {
+    const over = Math.min(elm.offsetTop + elm.offsetHeight - sheet.clientHeight + 14, rTotal.offsetTop - 6);
+    if (over > sheet.scrollTop) sheet.scrollTo({ top: over, behavior: h.reduced?.() ? 'auto' : 'smooth' });
+  };
   function countUp(elm, from, to, ms) {
     const t0 = performance.now();
     const step = () => {
@@ -620,6 +625,7 @@ export function createUI(h) {
     rMedal.innerHTML = '';
     rUnlock.innerHTML = '';
     rGoals.innerHTML = '';
+    sheet.scrollTop = 0;
     ui.raidBoard(r.day ? r.board : null);
     // The lines, one by one.
     let at = 300;
@@ -644,6 +650,7 @@ export function createUI(h) {
       const pos = (v) => `${Math.min(100, (v / top) * 100).toFixed(1)}%`;
       rMedal.innerHTML = `<div class="mbig">${medalSvg(sc.medal, 46)}<span class="slab">${sc.medal ? MEDALS[sc.medal] : 'No medal'}</span></div><div class="mbar"><i class="fill"></i>${[b, s, g].map((v, k) => `<span class="mk${sc.medal >= k + 1 ? ' got' : ''}" style="left:${pos(v)}">${medalSvg(k + 1, 14)}<em>${num(v)}</em></span>`).join('')}</div>`;
       rMedal.classList.add('on');
+      reveal(rMedal);
       requestAnimationFrame(() =>
         requestAnimationFrame(() => {
           const f = rMedal.querySelector('.fill');
@@ -668,6 +675,7 @@ export function createUI(h) {
     if (lv && r.rec) {
       later(at, () => {
         rXp.classList.add('on');
+        reveal(rXp);
         rXp.querySelector('.gain').textContent = `+${num(r.rec.xp)} XP`;
         const lvEl = rXp.querySelector('.lv');
         const bar = rXp.querySelector('.bar i');
@@ -709,6 +717,7 @@ export function createUI(h) {
             wear.disabled = true;
           });
           rUnlock.classList.add('on');
+          reveal(rUnlock);
           h.sfx?.('unlock');
         });
         at += 500;
@@ -718,6 +727,7 @@ export function createUI(h) {
       later(at, () => {
         rGoals.innerHTML = r.goals.map((g) => goalRow(g)).join('');
         rGoals.classList.add('on');
+        reveal(rGoals);
         if (r.goals.some((g) => g.now)) h.sfx?.('goal');
       });
     }
