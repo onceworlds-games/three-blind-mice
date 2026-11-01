@@ -152,8 +152,8 @@ export function createHuman(kind) {
     steel: std(0xdfe4ec, { roughness: 0.18, metalness: 0.6, emissive: 0x2a2e36 }),
     handle: patchEcho(pbr('wood_dark', { color: 0x8a5a3a })),
     rivet: std(0xd8d0c0, { roughness: 0.3, metalness: 0.8 }),
-    skin: patchEcho(std(0xe8b898, { roughness: 0.7, transparent: true, alphaMap: fadeTexture(0.5, 0.1) }), { rim: 0.2 }),
-    sleeve: patchEcho(pbr('cloth_hessian', { color: farmer ? 0x6a7a5a : 0xe8dcc8, transparent: true, alphaMap: fadeTexture(0.5, 0.1) }), { rim: 0.2 }),
+    skin: patchEcho(std(0xe8b898, { roughness: 0.7, emissive: 0x3a1608 }), { rim: 0.2 }),
+    sleeve: patchEcho(pbr('cloth_hessian', { color: farmer ? 0x6a7a5a : 0xe8dcc8, transparent: true, depthWrite: false, emissive: 0x2a1408, alphaMap: fadeTexture(0.55, 0.05) }), { rim: 0.2 }),
   };
   mats.leg.depthWrite = false;
   const root = new THREE.Group(); // feet and shins are in world space
@@ -195,18 +195,13 @@ export function createHuman(kind) {
   const skirt = new THREE.Mesh(skirtGeo, mats.skirt);
   skirt.position.y = farmer ? 2.9 : 2.3;
   skirt.renderOrder = 2;
+  skirt.visible = false; // seen from above a skirt reads as a glass jar: the legs and the lantern say enough
   body.add(skirt);
-  let hem = null;
-  if (!farmer) {
-    const hg = new THREE.CylinderGeometry(1.8, 1.82, 0.22, SK, 1, true);
-    hem = new THREE.Mesh(hg, mats.hem);
-    hem.position.y = 2.38;
-    body.add(hem);
-  }
+  const hem = null;
   // ---- the hand with the lantern (or the torch)
   const hand = new THREE.Group();
   body.add(hand);
-  const sleeve = mesh(new THREE.CylinderGeometry(0.3, 0.26, 2.4, 14, 1, true), mats.sleeve, 0, 1.3, 0, 1, 1, 1, false);
+  const sleeve = mesh(new THREE.CylinderGeometry(0.24, 0.21, 0.9, 14, 1, true), mats.sleeve, -0.02, 0.5, 0, 1, 1, 1, false);
   hand.add(sleeve);
   hand.add(mesh(SPH, mats.skin, 0, 0.0, 0, 0.26, 0.22, 0.24, false));
   const lamp = new THREE.Group();
@@ -482,7 +477,7 @@ export function poseHuman(model, h, now, dt, reduced = false, fx = null) {
   const sw = model.feet[0].x - model.feet[1].x;
   model.sway += ((reduced ? 0 : Math.max(-1, Math.min(1, speed * 0.25))) - model.sway) * Math.min(1, dt * 4);
   const pos = model.skirt.geometry.attributes.position;
-  const arr = pos.array;
+  const arr = model.skirt.visible ? pos.array : [];
   const base = model.skirtBase;
   const kick = reduced ? 0 : speed * 0.05;
   for (let i = 0; i < arr.length; i += 3) {
@@ -498,7 +493,7 @@ export function poseHuman(model, h, now, dt, reduced = false, fx = null) {
     arr[i + 2] = bz * (1 + wave) + (reduced ? 0 : sw * 0.02);
     arr[i + 1] = by + (reduced ? 0 : Math.sin(ang * 4 + now * 2.6) * 0.04);
   }
-  pos.needsUpdate = true;
+  if (model.skirt.visible) pos.needsUpdate = true;
   if (model.hem) {
     model.hem.rotation.y = reduced ? 0 : Math.sin(now * 1.7) * 0.03;
     model.hem.position.x = -model.sway * 0.18;

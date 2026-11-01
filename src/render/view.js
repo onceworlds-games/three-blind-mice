@@ -45,7 +45,7 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
   scene.fog = new THREE.Fog(PALETTE.midnight, 30, 70);
   const camera = new THREE.PerspectiveCamera(FOV, 1, 0.5, 300);
   // Light: a whisper of blue night everywhere, the moon through the windows, the lanterns, the hole's warmth, the stove.
-  const hemi = new THREE.HemisphereLight(0x4a5a9c, 0x0c0d18, 0.42);
+  const hemi = new THREE.HemisphereLight(0x4a5a9c, 0x0c0d18, 0.6);
   scene.add(hemi);
   const cookie = cookieTexture();
   const moons = [];
@@ -233,8 +233,8 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
       for (const g of w.ground) ang = Math.max(ang, dir.angleTo(g.clone().sub(w.light)));
       s.angle = Math.min(1.2, ang * 1.18);
       s.penumbra = 0.2;
-      s.userData.base = 26;
-      s.intensity = 26;
+      s.userData.base = 55;
+      s.intensity = 55;
     });
     renderer.shadowMap.needsUpdate = true;
     for (const [, hm] of v.humans) applyShadow(hm);

@@ -193,7 +193,7 @@ export function buildLevel(world) {
   }
   const paneMat = new THREE.MeshBasicMaterial({ map: skyTexture(true, night.id), color: 0x8a9acc });
   const paneMat2 = new THREE.MeshBasicMaterial({ map: skyTexture(false, night.id + 5), color: 0x8a9acc });
-  const beamMat = new THREE.MeshBasicMaterial({ map: beamTexture(), color: 0x6f86c8, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+  const beamMat = new THREE.MeshBasicMaterial({ map: beamTexture(), color: 0x6f86c8, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
   chosen.forEach(([x, z], i) => {
     const cx = x + 0.5;
     const fz = z + 1;
