@@ -352,8 +352,8 @@ async function boot() {
     if (st && (st.x || st.y)) {
       const m = Math.hypot(st.x, st.y);
       if (m > 0.12) {
-        // Tilt sets the speed: a phone player can creep.
-        const sp = Math.min(1, 0.3 + ((m - 0.12) / 0.68) * 0.7);
+        // Tilt sets the speed. Up to half way the mouse tiptoes (silent: under half of full speed); past it, it runs.
+        const sp = m < 0.5 ? 0.3 + ((m - 0.12) / 0.38) * 0.18 : Math.min(1, 0.6 + ((m - 0.5) / 0.35) * 0.4);
         ix += (st.x / m) * sp;
         iz += (st.y / m) * sp;
       }

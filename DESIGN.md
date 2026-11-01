@@ -36,7 +36,7 @@ before it has to be found.
 | | Keyboard | Phone |
 |---|---|---|
 | Move | WASD or the arrows | The platform's stick (`stick: 'analog'`, `zone: 'wide'`) |
-| Tiptoe (silent) | Hold Shift | Tilt the stick a little |
+| Tiptoe (silent) | Hold Shift | Push the stick less than half way |
 | Small squeak | Tap Space (let go within 0.3 s) | Tap **Squeak** (the big button) |
 | Big squeak | Hold Space: a ring preview grows around your mouse; let go once it's full (0.7 s) | Hold **Squeak** |
 | Pick up cheese | Automatic: touch it | Automatic |
@@ -46,8 +46,8 @@ before it has to be found.
 | Wardrobe (lobby) | G, or click your mouse or your level | Tap your mouse or your level |
 | Pause (alone only) | P or Esc | The platform's menu pauses |
 
-The stick's tilt sets the speed (0.3 to 1 of full, full past 80%), so a phone player can creep; on a keyboard Shift
-creeps (0.42 of full). At 1.5 u/s or slower a mouse **tiptoes**: no floor noise at all (creaky boards, crumbs, pans), a
+The stick's tilt sets the speed: up to half way it creeps (0.3 to 0.48 of full: silent), past half way it runs (0.6 to
+1, full past 85%); on a keyboard Shift creeps (0.42 of full). At 1.5 u/s or slower a mouse **tiptoes**: no floor noise at all (creaky boards, crumbs, pans), a
 lower, slower, stretched gait with high paw lifts, and a paw icon on the HUD. Nothing else: one action button and one that
 only exists while it's needed.
 
