@@ -408,7 +408,7 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
       // covers some, and the far floor is drawn smaller), so a tall phone isn't left with a band of dark at the bottom.
       const fit = (t, lo, hi, k) => (lo > hi ? hi + (lo - hi) * k : Math.max(lo, Math.min(hi, t)));
       c.tx = fit(c.tx, halfX - 0.4, world.W + 0.4 - halfX, 0.5);
-      c.tz = fit(c.tz, far - 0.6, world.D + 0.1 - near, 0.22);
+      c.tz = fit(c.tz, far - 0.6, world.D + 0.1 - near, 0.1);
     }
     // Punch-in: a quick zoom toward the action.
     span *= 1 - 0.3 * v.punch;
