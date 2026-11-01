@@ -1,0 +1,132 @@
+{
+  "slug": "three-blind-mice",
+  "name": "Three Blind Mice",
+  "description": "You can't see. Squeak to see. Steal the cheese, get home, keep your tail.",
+  "dir": "dist",
+  "productionBranch": "main",
+  "genre": "Adventure",
+  "icon": "store/icon.png",
+  "thumbnails": [
+    "store/thumb-1.png",
+    "store/thumb-2.png",
+    "store/thumb-3.png",
+    "store/thumb-4.png"
+  ],
+  "controls": [
+    {
+      "keys": [
+        "W",
+        "A",
+        "S",
+        "D"
+      ],
+      "action": "Sneak (or the arrow keys)"
+    },
+    {
+      "keys": [
+        "Space"
+      ],
+      "action": "Tap: small squeak, see nearby"
+    },
+    {
+      "keys": [
+        "Space"
+      ],
+      "action": "Hold: big squeak, see the room"
+    },
+    {
+      "keys": [
+        "E"
+      ],
+      "action": "Drop the cheese"
+    },
+    {
+      "keys": [
+        "P",
+        "Esc"
+      ],
+      "action": "Pause (when alone)"
+    },
+    {
+      "keys": [
+        "G"
+      ],
+      "action": "Change glasses (lobby)"
+    },
+    {
+      "keys": [
+        "Enter"
+      ],
+      "action": "Start or Ready; Next night"
+    },
+    {
+      "keys": [
+        "R",
+        "M"
+      ],
+      "action": "Results: Again, Map"
+    }
+  ],
+  "badges": [
+    {
+      "id": "first-squeak",
+      "name": "First Squeak",
+      "description": "Squeak for the first time",
+      "icon": "store/badge-first-squeak.png"
+    },
+    {
+      "id": "cheese-thief",
+      "name": "Cheese Thief",
+      "description": "Bring a wedge home",
+      "icon": "store/badge-cheese-thief.png"
+    },
+    {
+      "id": "still-got-it",
+      "name": "Still Got It",
+      "description": "Finish a night with your tail",
+      "icon": "store/badge-still-got-it.png"
+    },
+    {
+      "id": "close-shave",
+      "name": "Close Shave",
+      "description": "The knife lands a whisker away and misses",
+      "icon": "store/badge-close-shave.png"
+    },
+    {
+      "id": "decoy",
+      "name": "Decoy",
+      "description": "Bring cheese home while she searches where you squeaked",
+      "icon": "store/badge-decoy.png"
+    },
+    {
+      "id": "silent-run",
+      "name": "Silent Run",
+      "description": "All the cheese home with 5 squeaks or fewer",
+      "icon": "store/badge-silent-run.png"
+    },
+    {
+      "id": "let-sleeping-cats-lie",
+      "name": "Let Sleeping Cats Lie",
+      "description": "Clear the Dining Room without waking Butter",
+      "icon": "store/badge-let-sleeping-cats-lie.png"
+    },
+    {
+      "id": "whole-wheel",
+      "name": "The Whole Wheel",
+      "description": "Roll a whole wheel home",
+      "icon": "store/badge-whole-wheel.png"
+    },
+    {
+      "id": "see-how-they-run",
+      "name": "See How They Run",
+      "description": "Three mice home together with all the cheese",
+      "icon": "store/badge-see-how-they-run.png"
+    },
+    {
+      "id": "farmhouse",
+      "name": "Farmhouse",
+      "description": "Clear all twelve nights",
+      "icon": "store/badge-farmhouse.png"
+    }
+  ]
+}

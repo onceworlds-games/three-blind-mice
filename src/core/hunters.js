@@ -253,7 +253,7 @@ function tickHuman(h, ctx, now, dt, events) {
         if (d <= c.reach && now >= h.cool) {
           let px = m.x + m.vx * c.lead;
           let pz = m.z + m.vz * c.lead;
-          if (!clearAt(world, px, pz, 0.2, 'mouse') || Math.hypot(px - h.x, pz - h.z) > c.reach + 0.8) {
+          if (!clearAt(world, px, pz, 0.2, 'mouse') || Math.hypot(px - h.x, pz - h.z) > c.reach + 1.5) {
             px = m.x;
             pz = m.z;
           }
