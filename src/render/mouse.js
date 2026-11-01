@@ -637,8 +637,8 @@ export function poseMouse(model, m, t, dt, reduced = false, fx = null) {
   if (fx && !reduced) {
     model.dustT -= dt;
     if ((model.skid > 0 || (speed > 2.2 && model.dustT <= 0)) && m.st === 'play') {
-      model.dustT = 0.09;
-      fx.dust(m.x - Math.cos(m.a) * 0.18, m.z - Math.sin(m.a) * 0.18, model.skid > 0 ? 3 : 1, m.a);
+      model.dustT = 0.14;
+      fx.dust(m.x - Math.cos(m.a) * 0.18, m.z - Math.sin(m.a) * 0.18, model.skid > 0 ? 3 : 1, m.a, model.skid > 0 ? 0.55 : 0.4);
     }
   }
   // Charge preview.

@@ -164,11 +164,15 @@ export function createBurrow() {
       });
       flame.scale.set(1, 2 + (reduced ? 0 : Math.sin(t * 17) * 0.25), 1);
       light.intensity = 40 + (reduced ? 0 : Math.sin(t * 13) * 3 + Math.sin(t * 7) * 2);
+      // The results sheet sits on the right (landscape) or below (portrait): the party sits clear of it.
       const aspect = camera.aspect;
-      const d = aspect < 1 ? 11.5 : 7.2;
+      const portrait = aspect < 1;
+      const d = portrait ? 11.5 : 7.4;
       const sway = reduced ? 0 : Math.sin(t * 0.3) * 0.25;
-      camera.position.set(sway, aspect < 1 ? 4.2 : 3.2, d);
-      camera.lookAt(0, aspect < 1 ? 0.2 : 0.9, -0.6);
+      const side = vm.burrowSide ?? (portrait ? 0 : 1.9);
+      const drop = portrait ? 2.4 : 0;
+      camera.position.set(sway + side, portrait ? 4.2 : 3.2, d);
+      camera.lookAt(side, (portrait ? 0.2 : 0.9) - drop, -0.6);
     },
   };
 }

@@ -137,7 +137,7 @@ export function createUI(h) {
     };
   }
   const boardRows = (top) => top.map((e, i) => `<div class="${e.me ? 'me' : ''}"><i>${i + 1}</i><span>${esc(e.name)}</span><b>${num(e.score)}</b></div>`).join('');
-  const goalRow = (g) => `<div class="goal${g.done ? ' done' : ''}${g.now ? ' now' : ''}"><span class="gl">${esc(g.label)}</span><span class="gp">${g.done ? CHECK : `${num(g.have)}/${num(g.need)}`}</span><span class="gb"><i style="width:${Math.round((g.have / g.need) * 100)}%"></i></span></div>`;
+  const goalRow = (g) => `<div class="goal${g.done ? ' done' : ''}${g.now ? ' now' : ''}${g.week ? ' wk' : ''}"><span class="gl">${esc(g.label)}</span><span class="gp">${g.done ? CHECK : `${num(g.have)}/${num(g.need)}`}</span><span class="gb"><i style="width:${Math.round((g.have / g.need) * 100)}%"></i></span></div>`;
 
   // ------------------------------------------------------------ title
   const tName = el('div', 'name slab lit', screens.title);
@@ -165,7 +165,7 @@ export function createUI(h) {
       tDaily.querySelector('.dt').innerHTML = `<span class="tw">${esc(d.twist)}</span>${d.best ? `<span>Yours <b>${num(d.best)}</b></span>` : ''}`;
       tDaily.querySelector('.dtop').innerHTML = d.top.length ? boardRows(d.top.slice(0, 3)) : `<div class="none">${d.raiders ? `${num(d.raiders)} raided today` : 'Nobody yet today'}</div>`;
     }
-    tGoals.innerHTML = s.goals.length ? `<div class="gh"><b class="slab">Today</b>${s.allDone ? `<span>${CHECK}</span>` : ''}</div>${s.goals.map((g) => goalRow(g)).join('')}` : '';
+    tGoals.innerHTML = s.goals.length ? `<div class="gh"><b class="slab">Today</b>${s.allDone ? `<span>${CHECK}</span>` : ''}</div>${s.goals.map((g) => goalRow(g)).join('')}${s.week ? `<div class="gh wkh"><b class="slab">This week</b><span class="xpv">+600 XP</span></div>${goalRow(s.week)}` : ''}` : '';
     tGoals.style.display = s.goals.length ? '' : 'none';
   };
   ui.lightTitle = (x, r) => {
@@ -716,12 +716,20 @@ export function createUI(h) {
     }
     rRows.textContent = '';
     if (r.rows.length > 1) {
+      // Who did what: a title each for the best carrier and the best crumb eater; a bandage for a lost tail.
+      const most = (k) => {
+        const top = Math.max(...r.rows.map((x) => x[k] ?? 0));
+        return top > 0 && r.rows.filter((x) => (x[k] ?? 0) === top).length === 1 ? top : -1;
+      };
+      const homeTop = most('home');
+      const crumbTop = most('crumbs');
       for (const row of r.rows) {
         const d = el('div', '', rRows);
         d.innerHTML = `<span>${seatSvg(row.seat, 16)}</span>`;
-        el('span', '', d, row.name + (row.me ? ' (you)' : ''));
+        el('span', '', d, row.name + (row.me && row.name !== 'You' ? ' (you)' : ''));
         el('span', '', d, `${row.home} home · ${row.crumbs} crumbs`);
-        el('span', '', d, row.tail ? 'tail' : 'bandaged');
+        const tag = row.home === homeTop ? 'Cheese runner' : row.crumbs === crumbTop ? 'Crumb hoover' : row.tail ? '' : 'Bandaged';
+        el('span', `tag${row.tail ? '' : ' hurt'}`, d, tag || '·');
       }
     }
     rBtns.textContent = '';

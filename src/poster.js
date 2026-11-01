@@ -159,7 +159,7 @@ function scene(name) {
 function win() {
   const view = makeView();
   view.mode = 'burrow';
-  const vm = { burrow: { wedges: 6, wheel: true, mice: [{ seat: 0, tail: 1, g: 0 }, { seat: 1, tail: 0, g: 5 }, { seat: 2, tail: 1, g: 2 }] } };
+  const vm = { burrowSide: 0, burrow: { wedges: 6, wheel: true, mice: [{ seat: 0, tail: 1, look: { g: 0, h: 4, f: 0, t: 0 } }, { seat: 1, tail: 0, look: { g: 5, h: 6, f: 7, t: 0 } }, { seat: 2, tail: 1, look: { g: 2, h: 3, f: 1, t: 0 } }] } };
   view.setQuality('high');
   shoot(view, vm, 4);
   overlay(`<div class="pt-win"><div class="pt-morning slab lit">Morning</div><div class="pt-stars">${starSvg(true, 64)}${starSvg(true, 64)}${starSvg(true, 64)}</div></div>`);

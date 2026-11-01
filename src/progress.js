@@ -5,8 +5,8 @@
 import { NIGHT_COUNT } from './core/levels.js';
 import { starCount } from './core/night.js';
 import { cleanLook, unlockedAt } from './looks.js';
-import { prevDay, validDay } from './core/daily.js';
-import { GOALS, goalsFor, cleanGoals } from './goals.js';
+import { prevDay, validDay, weekOf } from './core/daily.js';
+import { GOALS, goalsFor, cleanGoals, WEEKLY, weeklyFor, WEEKLY_XP } from './goals.js';
 
 const KEY = 'progress';
 const TOTALS = ['crumbs', 'shaves', 'nights', 'unseen', 'raids', 'golds', 'goals'];
@@ -20,6 +20,7 @@ const fresh = () => ({
   xp: 0,
   look: { g: 0, h: 0, f: 0, t: 0 },
   daily: { day: 0, goals: [], raid: 0, all: 0 },
+  weekly: { week: 0, id: '', need: 0, have: 0, done: 0 },
   streak: { n: 0, last: 0, best: 0 },
   totals: Object.fromEntries(TOTALS.map((k) => [k, 0])),
   hints: {},
@@ -58,6 +59,12 @@ export function cleanProgress(raw) {
     p.daily.goals = cleanGoals(d.goals);
     p.daily.raid = isNum(d.raid, 0, 99999) ? Math.floor(d.raid) : 0;
     p.daily.all = d.all ? 1 : 0;
+  }
+  const w = raw.weekly && typeof raw.weekly === 'object' ? raw.weekly : {};
+  if (validDay(w.week) && WEEKLY[w.id]) {
+    const need = WEEKLY[w.id].need;
+    p.weekly = { week: w.week, id: w.id, need, have: isNum(w.have, 0, need) ? Math.floor(w.have) : 0, done: 0 };
+    p.weekly.done = w.done && p.weekly.have >= need ? 1 : 0;
   }
   const s = raw.streak && typeof raw.streak === 'object' ? raw.streak : {};
   p.streak.n = isNum(s.n, 0, 9999) ? Math.floor(s.n) : 0;
@@ -100,6 +107,11 @@ export function mergeProgress(into, p) {
         g.done = g.done || o.done;
       }
     });
+  }
+  if (p.weekly.week > into.weekly.week) into.weekly = { ...p.weekly };
+  else if (p.weekly.week === into.weekly.week && p.weekly.id === into.weekly.id) {
+    into.weekly.have = Math.max(into.weekly.have, p.weekly.have);
+    into.weekly.done = into.weekly.done || p.weekly.done;
   }
   if (p.streak.last > into.streak.last) into.streak = { ...p.streak };
   into.streak.best = Math.max(into.streak.best, p.streak.best);
@@ -153,7 +165,14 @@ export function nightXp(score, { raid = false } = {}) {
 
 // Today's goals, fresh when the day changed.
 export function ensureDay(p, day) {
-  if (!validDay(day) || p.daily.day === day) return false;
+  if (!validDay(day)) return false;
+  const week = weekOf(day);
+  let changed = false;
+  if (p.weekly.week !== week) {
+    p.weekly = { week, ...weeklyFor(week), have: 0, done: 0 };
+    changed = true;
+  }
+  if (p.daily.day === day) return changed;
   p.daily = { day, goals: goalsFor(day, unlockedNights(p)).map((g) => ({ id: g.id, need: g.need, have: 0, done: 0 })), raid: 0, all: 0 };
   return true;
 }
@@ -183,7 +202,7 @@ export function goalProgress(id, r) {
 // r: the session's result (with r.score); squeaks: this page's; day: today. Returns what changed, for the results screen.
 export function recordNight(p, r, squeaks, day = 0) {
   const i = r.night - 1;
-  const out = { stars: 0, newBest: false, firstScore: false, medalUp: 0, xp: 0, levelFrom: levelOf(p.xp).level, levelTo: 0, goals: [], allGoals: false, raidBest: false, streakUp: false };
+  const out = { stars: 0, newBest: false, firstScore: false, medalUp: 0, xp: 0, levelFrom: levelOf(p.xp).level, levelTo: 0, goals: [], allGoals: false, weekly: false, raidBest: false, streakUp: false };
   if (i < 0 || i >= NIGHT_COUNT) return out;
   const sc = r.score;
   const raid = !!r.day;
@@ -235,6 +254,18 @@ export function recordNight(p, r, squeaks, day = 0) {
       p.daily.all = 1;
       out.allGoals = true;
       out.xp += 250;
+    }
+    const w = p.weekly;
+    if (w.id && !w.done) {
+      const add = Math.max(0, Math.floor(WEEKLY[w.id]?.track(r) || 0));
+      if (add) {
+        w.have = Math.min(w.need, w.have + add);
+        if (w.have >= w.need) {
+          w.done = 1;
+          out.weekly = true;
+          out.xp += WEEKLY_XP;
+        }
+      }
     }
   }
   p.xp += out.xp;

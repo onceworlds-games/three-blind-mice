@@ -218,10 +218,12 @@ async function boot() {
   function goalsView(now = []) {
     return progress.daily.day === today() ? progress.daily.goals.map((g) => ({ label: goalLabel(g.id), have: g.have, need: g.need, done: g.done, now: now.includes(g.id) })) : [];
   }
+  const weekView = (now = false) => (progress.weekly.id ? { label: goalLabel(progress.weekly.id), have: progress.weekly.have, need: progress.weekly.need, done: progress.weekly.done, now, week: true } : null);
   function refreshTitle() {
     ensureDay(progress, today());
+    readRaidBoard();
     const lv = levelOf(progress.xp);
-    ui.title({ level: lv.level, into: lv.into, need: lv.need, streak: liveStreak(progress, today()), daily: raidInfo(), goals: goalsView(), allDone: !!progress.daily.all });
+    ui.title({ level: lv.level, into: lv.into, need: lv.need, streak: liveStreak(progress, today()), daily: raidInfo(), goals: goalsView(), week: weekView(), allDone: !!progress.daily.all });
   }
   readRaidBoard(true);
 
@@ -444,7 +446,7 @@ async function boot() {
       rec,
       level: { from: xpBefore.level, to: xpAfter.level, into: xpAfter.into, need: xpAfter.need, before: xpBefore.into / xpBefore.need },
       unlocked: UNLOCKS.filter((u) => u.level > xpBefore.level && u.level <= xpAfter.level).map((u) => ({ kind: u.kind, id: u.id })),
-      goals: goalsView(rec.goals),
+      goals: [...goalsView(rec.goals), ...(weekView(rec.weekly) ? [weekView(rec.weekly)] : [])],
     };
     const sc = r.score;
     // Badges.
@@ -524,13 +526,25 @@ async function boot() {
             audio.play('nibble');
             hints.done('grab');
             if (f.k === 'W') hints.show('wheel');
+            if (session.data?.it[f.i]?.gd) {
+              audio.play('golden');
+              ui.call(`Golden wedge · ${SCORE.gold}`, 'gold');
+            }
           }
           break;
         case 'drop':
           if (f.mine) audio.play('drop');
           break;
-        case 'home':
+        case 'home': {
           audio.play('home');
+          const it = session.data?.it[f.i];
+          if (it) {
+            const pts = it.k === 'W' ? SCORE.wheel : it.gd ? SCORE.gold : SCORE.wedge;
+            const [hx, hz] = holeMouth(session.world);
+            view.project(hx, 0.6, hz, proj);
+            if (proj.on) ui.pop(proj.x, proj.y, `+${pts}`, 'x5');
+            view.punchIn(0.35);
+          }
           if (f.mine) {
             award('cheese-thief');
             hints.done('home');
@@ -539,6 +553,7 @@ async function boot() {
             if (searching) award('decoy');
           }
           break;
+        }
         case 'ouch':
           view.addTrauma(0.6);
           safe(() => navigator.vibrate?.(40));
@@ -941,6 +956,7 @@ async function boot() {
       const players = [...room.players.values()].filter((p) => p.connected !== false).slice(0, 3);
       const pickDay = s.pickDay();
       const lv = levelOf(progress.xp);
+      if (pickDay) readRaidBoard();
       const raid = pickDay ? raidInfo() : null;
       ui.lobby({
         pick: s.pick(),

@@ -24,7 +24,25 @@ export const GOALS = {
   quick: { tier: 2, need: 1, label: 'Full Quick paws bonus', track: (r) => ((r.score?.lines?.find((l) => l.id === 'speed')?.pts ?? 0) >= 1000 ? 1 : 0) },
 };
 
-export const goalLabel = (id) => GOALS[id]?.label ?? '';
+export const goalLabel = (id) => GOALS[id]?.label ?? WEEKLY[id]?.label ?? '';
+
+// The week's one big goal, the same for everyone that week: 600 XP.
+export const WEEKLY = {
+  crumbs300: { need: 300, label: 'Eat 300 crumbs', track: (r) => r.mine?.crumbs },
+  golds3: { need: 3, label: 'Win 3 gold medals', track: (r) => (r.score?.medal === 3 ? 1 : 0) },
+  raids5: { need: 5, label: 'Play 5 Daily Raids', track: (r) => (r.day && r.score?.counts ? 1 : 0) },
+  shaves10: { need: 10, label: '10 close shaves', track: (r) => r.mine?.shaves },
+  unseen4: { need: 4, label: '4 nights unseen', track: (r) => (has(r, 'unseen') ? 1 : 0) },
+  wedges25: { need: 25, label: 'Bring 25 cheeses home', track: (r) => r.mine?.home },
+  chains5: { need: 5, label: 'Chain ×5 on 5 nights', track: (r) => ((r.mine?.chain ?? 0) >= 5 ? 1 : 0) },
+};
+export const WEEKLY_XP = 600;
+export function weeklyFor(week) {
+  const ids = Object.keys(WEEKLY);
+  const rng = createRng(hashSeed(`week:${week}`));
+  const id = ids[rng.int(ids.length)];
+  return { id, need: WEEKLY[id].need };
+}
 
 // The day's three goals for a player with `unlocked` nights open.
 export function goalsFor(day, unlocked = 1) {

@@ -32,6 +32,16 @@ export function prevDay(day) {
   return dayKey(Date.UTC(y, m - 1, d) - 86400000);
 }
 
+// The Monday (UTC) of a day's week: the weekly goal's key.
+export function weekOf(day) {
+  const y = Math.floor(day / 10000);
+  const m = Math.floor(day / 100) % 100;
+  const d = day % 100;
+  const t = Date.UTC(y, m - 1, d);
+  const dow = (new Date(t).getUTCDay() + 6) % 7;
+  return dayKey(t - dow * 86400000);
+}
+
 // Which night and twist a day gets. Nights 2-12 in a shuffled cycle, so a week rarely repeats one.
 export function dailyPlan(day) {
   const rng = createRng(hashSeed(`raid:${day}`));

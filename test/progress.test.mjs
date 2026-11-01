@@ -196,3 +196,36 @@ test("today's raid board: only today's sane entries, each player's best once, be
   assert.deepEqual(raidTop('junk', day), []);
   assert.equal(raidTop(Array.from({ length: 40 }, (_, i) => e(`p${i}`, i * 10)), day).length, 10);
 });
+
+test('the weekly goal: one per week (Monday, UTC), counted across days, paid once, cleaned and merged', async () => {
+  const { weekOf } = await import('../src/core/daily.js');
+  const { WEEKLY, weeklyFor, WEEKLY_XP } = await import('../src/goals.js');
+  assert.equal(weekOf(20261101), 20261026, 'a Sunday belongs to the Monday before');
+  assert.equal(weekOf(20261102), 20261102);
+  assert.equal(weekOf(20261108), 20261102);
+  assert.equal(weekOf(20260101), 20251229, 'across the year');
+  assert.deepEqual(weeklyFor(20261102), weeklyFor(20261102));
+  const p = cleanProgress(null);
+  ensureDay(p, 20261102);
+  assert.equal(p.weekly.week, 20261102);
+  p.weekly = { week: 20261102, id: 'crumbs300', need: 300, have: 280, done: 0 };
+  ensureDay(p, 20261104);
+  assert.equal(p.weekly.have, 280, 'same week: kept');
+  const xp0 = p.xp;
+  const r = recordNight(p, night(2, { mine: { crumbs: 30, chain: 1, shaves: 0, tail: 1, home: 1 } }), 3, 20261104);
+  assert.equal(r.weekly, true);
+  assert.equal(p.weekly.have, 300);
+  assert.ok(p.xp - xp0 >= WEEKLY_XP);
+  assert.equal(recordNight(p, night(2), 3, 20261104).weekly, false, 'once');
+  ensureDay(p, 20261109);
+  assert.equal(p.weekly.week, 20261109);
+  assert.equal(p.weekly.have, 0);
+  assert.ok(WEEKLY[p.weekly.id]);
+  const junk = cleanProgress({ v: 2, weekly: { week: 20261102, id: 'nope', have: 5 } });
+  assert.equal(junk.weekly.id, '');
+  const capped = cleanProgress({ v: 2, weekly: { week: 20261102, id: 'golds3', have: 99, done: 1 } });
+  assert.equal(capped.weekly.have, 0, 'out of range: back to 0');
+  const a = cleanProgress({ v: 2, weekly: { week: 20261102, id: 'golds3', have: 1 } });
+  mergeProgress(a, cleanProgress({ v: 2, weekly: { week: 20261102, id: 'golds3', have: 2 } }));
+  assert.equal(a.weekly.have, 2);
+});

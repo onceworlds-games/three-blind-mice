@@ -118,9 +118,8 @@ void echoCut(vec3 wp) {
   vec3 op = wp - cameraPosition;
   float along = dot(op, rd);
   if (along > far - 0.25) return;
-  float perp = length(op - rd * along);
-  float n = fract(sin(dot(floor(gl_FragCoord.xy), vec2(12.9898, 78.233))) * 43758.5453);
-  if (perp < uCut.w * (0.72 + 0.28 * n)) discard;
+  // A clean edge: a dithered one leaves a depth edge at every other pixel, and the outline pass draws each as a speck.
+  if (length(op - rd * along) < uCut.w * 0.86) discard;
 }
 `;
 

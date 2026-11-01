@@ -179,6 +179,22 @@
 .goals .gh span {
   color: #6fe0b0;
 }
+.goals .gh.wkh {
+  margin-top: 8px;
+  font-size: 17px;
+  color: #9fd8ff;
+}
+.goals .gh .xpv {
+  font: 700 13px var(--sans);
+  color: rgba(159, 216, 255, 0.75);
+  align-self: center;
+}
+.goal.wk .gb i {
+  background: #9fd8ff;
+}
+.goal.wk.done .gb i {
+  background: #6fe0b0;
+}
 .goal {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -352,6 +368,10 @@
   .goal {
     font-size: 13px;
     padding-top: 2px;
+  }
+  .goals .wkh,
+  .goals .goal.wk {
+    display: none;
   }
 }
 
@@ -725,6 +745,10 @@
   opacity: 1;
   transform: translateX(-50%) scale(1);
 }
+#hud .call.gold {
+  color: #ffd23f;
+  text-shadow: 0 0 16px rgba(255, 210, 63, 0.7), 0 2px 0 #000;
+}
 #hud .call.warn {
   color: #ff7b22;
 }
@@ -970,6 +994,13 @@
   position: static;
   margin-top: 10px;
   font-size: 15px;
+}
+#results .sheet .rows .tag {
+  color: var(--cheese);
+  font-weight: 700;
+}
+#results .sheet .rows .tag.hurt {
+  color: #ff7fa8;
 }
 @media (max-aspect-ratio: 1/1) {
   #results .head {
