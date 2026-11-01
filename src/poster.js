@@ -90,7 +90,7 @@ function scene(name) {
     squeak(sim, 'big', sim.mice[0], 0.16);
     vm = viewFromSim(sim);
     vm.focus = null;
-    aim(view, sim.world, 14.2, 9.6, 8.4, (60 * Math.PI) / 180);
+    aim(view, sim.world, 14.6, 9.8, 7.0, (60 * Math.PI) / 180);
     shoot(view, vm);
     overlay(`<div class="pt-cover"><div class="pt-name slab lit">Three<br>Blind Mice</div><div class="pt-tag">Squeak to see.</div></div>`);
     return;
@@ -107,7 +107,7 @@ function scene(name) {
       hunters: ([wife], s) => Object.assign(wife, { x: 16.5, z: 3.3, a: Math.PI / 2, m: 'recover', ch: { x: 16.5, z: 5.5, at: s.now - 0.12, seq: 1, r: 0.85, by: 'm1' } }),
     });
     sim.rings.push({ kind: 'midnight', x: 1, z: 1, t: sim.now - 30, src: '' });
-    squeak(sim, 'small', sim.mice[0], 0.28);
+    squeak(sim, 'small', sim.mice[0], 0.6);
     vm = viewFromSim(sim);
     vm.focus = vm.mice[0];
     aim(view, sim.world, 15.4, 5.5, 5.6, (60 * Math.PI) / 180);
@@ -131,9 +131,9 @@ function scene(name) {
     const wi = sim.data.it.findIndex((it) => it.k === 'W');
     Object.assign(sim.data.it[wi], { x: wx, z: wz, by: 'm1', h: ['m2'] });
     sim.rings.push({ kind: 'midnight', x: 1, z: 1, t: sim.now - 30, src: '' });
-    squeak(sim, 'big', sim.mice[2], 0.2);
-    squeak(sim, 'small', sim.mice[0], 0.3);
-    squeak(sim, 'small', sim.mice[1], 0.12);
+    squeak(sim, 'big', sim.mice[2], 0.3);
+    squeak(sim, 'small', sim.mice[0], 0.55);
+    squeak(sim, 'small', sim.mice[1], 0.42);
     vm = viewFromSim(sim);
     vm.focus = null;
     aim(view, sim.world, wx - 0.6, wz - 0.5, 6.2, (58 * Math.PI) / 180);
@@ -377,10 +377,11 @@ function badge(id) {
     st.look.set(0.05, 0.25, 0.05);
   } else if (id === 'let-sleeping-cats-lie') {
     const cat = createCat();
-    poseCat(cat, { x: 0.1, z: 0, a: FACING - 0.7, m: 'sleep', ch: null }, 1, 1 / 30, true);
+    poseCat(cat, { x: 0.1, z: 0, a: FACING + 0.5, m: 'sleep', ch: null }, 1, 1 / 30, true);
     st.scene.add(cat.root);
-    st.look.set(0.1, 0.3, 0.05);
-    st.distance = 4.6;
+    st.look.set(0.2, 0.2, -0.25);
+    st.distance = 5.6;
+    st.pitch = 1.1;
   } else if (id === 'whole-wheel') {
     const w = createWheel();
     w.root.position.set(0.25, 0, -0.1);

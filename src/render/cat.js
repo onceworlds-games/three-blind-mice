@@ -80,6 +80,9 @@ export function createCat() {
   const tex = tabbyTexture();
   const mats = {
     fur: patchEcho(std(0xffffff, { map: tex }), { rim: 0.45, fill: 1.2 }),
+    // The head is plain ginger (stripes on a round head pinch into a beach ball), with a darker brow.
+    head: patchEcho(std(0xe08a42), { rim: 0.45, fill: 1.2 }),
+    brow: patchEcho(std(0xa04e1c, { roughness: 0.95 }), { rim: 0.2 }),
     pale: patchEcho(std(0xf6dcb4, { roughness: 0.95 }), { rim: 0.25 }),
     pink: patchEcho(std(0xe89a9a, { roughness: 0.6 }), { rim: 0.2 }),
     inner: patchEcho(std(0xf0a8a0, { roughness: 0.8, emissive: 0x301010, side: THREE.DoubleSide }), { rim: 0.1 }),
@@ -110,8 +113,10 @@ export function createCat() {
   const head = new THREE.Group();
   head.position.set(0.16, 0.18, 0);
   neck.add(head);
-  head.add(mesh(HEAD, mats.fur, 0, 0, 0, 1, 0.92, 1.05));
-  for (const side of [-1, 1]) head.add(mesh(SPH, mats.fur, 0.06, -0.08, side * 0.15, 0.17, 0.13, 0.13, false));
+  head.add(mesh(HEAD, mats.head, 0, 0, 0, 1, 0.92, 1.05));
+  for (const side of [-1, 1]) head.add(mesh(SPH, mats.head, 0.06, -0.08, side * 0.15, 0.17, 0.13, 0.13, false));
+  // Tabby brow stripes over the eyes.
+  for (const k of [-1, 0, 1]) head.add(mesh(SPH_LO, mats.brow, 0.02 - Math.abs(k) * 0.02, 0.262 - Math.abs(k) * 0.014, k * 0.075, 0.11, 0.04, 0.022, false));
   head.add(mesh(SPH, mats.pale, 0.21, -0.08, 0, 0.11, 0.08, 0.13, false));
   head.add(mesh(SPH_LO, mats.pink, 0.29, -0.03, 0, 0.035, 0.025, 0.04, false));
   const ears = [];
@@ -120,7 +125,7 @@ export function createCat() {
   for (const side of [-1, 1]) {
     const ear = new THREE.Group();
     ear.position.set(-0.04, 0.21, side * 0.15);
-    const outer = mesh(new THREE.ConeGeometry(0.11, 0.24, 4, 1), mats.fur, 0, 0.1, 0, 1, 1, 0.45);
+    const outer = mesh(new THREE.ConeGeometry(0.11, 0.24, 4, 1), mats.head, 0, 0.1, 0, 1, 1, 0.45);
     outer.rotation.y = Math.PI / 4;
     const inner = mesh(new THREE.ConeGeometry(0.075, 0.17, 3, 1), mats.inner, 0.025, 0.08, 0, 1, 1, 0.3, false);
     ear.add(outer, inner);
@@ -272,8 +277,9 @@ export function poseCat(model, h, now, dt, reduced = false, fx = null) {
   model.torso.rotation.z = crouch ? 0.08 : 0;
   // Breathing, curled asleep.
   const breathe = (asleep || resting) && !reduced ? Math.sin(now * 2.1) * 0.04 : 0;
-  model.body.scale.set(leap ? 1.12 : 1, 0.92 + breathe, 0.92 + breathe * 0.5);
-  model.torso.rotation.y = asleep ? 0.25 : 0;
+  // Asleep she curls: shorter, rounder, turned in on herself.
+  model.body.scale.set(leap ? 1.12 : asleep ? 0.84 : 1, (asleep ? 1 : 0.92) + breathe, (asleep ? 1.02 : 0.92) + breathe * 0.5);
+  model.torso.rotation.y = asleep ? 0.45 : 0;
   // Head: tucked asleep, raised listening, low and still stalking, locked on in a crouch.
   const look = Math.atan2(h.tz - h.z, h.tx - h.x) - h.a;
   const turn = Math.atan2(Math.sin(look), Math.cos(look));
