@@ -320,21 +320,21 @@ export function createUI(h) {
   }
   function drawWardrobe() {
     if (!wState) return;
-    const { level, look, trying } = wState;
+    const { level, look, trying, tryLast } = wState;
     wLv.textContent = `Lv ${level}`;
     for (const b of wTabs.children) b.classList.toggle('sel', b.dataset.kind === wKind);
     wGrid.textContent = '';
     KINDS[wKind].forEach((it, id) => {
       const open = unlockedAt(wKind, id, level);
       const on = look[KIND_KEY[wKind]] === id;
-      const tried = !open && trying?.kind === wKind && trying.id === id;
+      const tried = !open && trying?.[wKind] === id;
       const b = el('button', `wi${on ? ' on' : ''}${open ? '' : ' locked'}${tried ? ' trying' : ''}`, wGrid);
       const u = UNLOCKS.find((x) => x.kind === wKind && x.id === id);
       b.innerHTML = `${itemSwatch(wKind, id)}<span>${esc(it.name)}</span>${open ? (on ? `<em>${CHECK}</em>` : '') : `<em>${lockSvg}${u?.level ?? '?'}</em>`}`;
       // A locked one can be tried on: the mouse wears it until you pick another or close.
       press(b, () => (open ? h.onWear(wKind, id) : h.onTry(wKind, id)));
     });
-    const u = trying && UNLOCKS.find((x) => x.kind === trying.kind && x.id === trying.id);
+    const u = tryLast && UNLOCKS.find((x) => x.kind === tryLast.kind && x.id === tryLast.id);
     const nx = UNLOCKS.find((x) => x.level > level);
     wNext.innerHTML = u ? `Trying on · unlocks at <b>Lv ${u.level}</b>` : nx ? `Next <b>Lv ${nx.level}</b> · ${esc(KINDS[nx.kind][nx.id].name)}` : 'Everything unlocked';
   }
@@ -346,8 +346,9 @@ export function createUI(h) {
       return;
     }
     if (wState && JSON.stringify(wState) === JSON.stringify(s)) return;
-    wState = { level: s.level, look: { ...s.look }, trying: s.trying ?? null };
-    if (s.trying && s.trying.kind !== wKind) wKind = s.trying.kind;
+    const switchTo = s.tryLast && s.tryLast.kind !== wState?.tryLast?.kind ? s.tryLast.kind : '';
+    wState = { level: s.level, look: { ...s.look }, trying: { ...(s.trying ?? {}) }, tryLast: s.tryLast ?? null };
+    if (switchTo) wKind = switchTo;
     drawWardrobe();
   };
 

@@ -164,13 +164,19 @@ async function boot() {
 
   // ------------------------------------------------------------ the wardrobe
   let dressing = false;
-  // A locked item tried on in the wardrobe: only this page's picture wears it, never the save or the room.
-  let trying = null;
+  // Locked items tried on in the wardrobe ({ kind: id }, one per kind): only this page's picture wears them, never the save
+  // or the room. tryLast: the one tried last, for the panel's line.
+  let trying = {};
+  let tryLast = null;
   const LOOK_KEY = { glasses: 'g', hat: 'h', fur: 'f', trail: 't' };
-  const drawWardrobe = () => ui.wardrobe(dressing ? { level: levelOf(progress.xp).level, look: progress.look, trying } : null);
+  const drawWardrobe = () => {
+    lookShown();
+    ui.wardrobe(dressing ? { level: levelOf(progress.xp).level, look: progress.look, trying, tryLast } : null);
+  };
   function setWardrobe(on) {
     dressing = !!on && screen === 'game' && session?.phase === 'lobby';
-    trying = null;
+    trying = {};
+    tryLast = null;
     drawWardrobe();
     audio.play(dressing ? 'whistle' : 'click');
   }
@@ -178,7 +184,8 @@ async function boot() {
     const key = LOOK_KEY[kind];
     if (!key || !unlockedAt(kind, id, levelOf(progress.xp).level)) return;
     progress.look = { ...progress.look, [key]: id };
-    trying = null;
+    delete trying[kind];
+    if (tryLast?.kind === kind) tryLast = null;
     persist();
     audio.play('nibble');
     view.punchIn?.(0.4);
@@ -186,11 +193,24 @@ async function boot() {
   }
   function tryOn(kind, id) {
     if (!LOOK_KEY[kind] || !KINDS[kind]?.[id]) return;
-    trying = trying?.kind === kind && trying.id === id ? null : { kind, id };
+    if (trying[kind] === id) {
+      delete trying[kind];
+      tryLast = null;
+    } else {
+      trying[kind] = id;
+      tryLast = { kind, id };
+    }
     audio.play('tap');
     drawWardrobe();
   }
-  const lookShown = () => (trying ? { ...progress.look, [LOOK_KEY[trying.kind]]: trying.id } : progress.look);
+  // The look the lobby shows on this page's mouse: worn plus tried on (null when nothing is tried on).
+  let shownLook = null;
+  function lookShown() {
+    if (!Object.keys(trying).length) return (shownLook = null);
+    shownLook = { ...progress.look };
+    for (const k in trying) shownLook[LOOK_KEY[k]] = trying[k];
+    return shownLook;
+  }
 
   // ------------------------------------------------------------ the title's meta: level, streak, goals, today's raid
   function readRaidBoard(force = false) {
@@ -957,10 +977,7 @@ async function boot() {
       if (view.world !== s.world) lobbyRings = lobbyRings.filter((r) => r.kind === 'midnight').map((r) => ({ ...r, t: lobbyT }));
       const mine = s.mice.find((m) => m.me) ?? null;
       let mice = s.mice;
-      if (trying && mine) {
-        const lk = lookShown();
-        mice = s.mice.map((m) => (m.me ? { ...m, look: lk, g: lk.g } : m));
-      }
+      if (dressing && shownLook && mine) mice = s.mice.map((m) => (m.me ? { ...m, look: shownLook, g: shownLook.g } : m));
       vm = { world: s.world, data: null, mice, items: s.items, rings: lobbyRings, hunters: [], now: lobbyT, focus: dressing ? mine : null };
       view.mode = dressing && mine ? 'wardrobe' : 'orbit';
       const players = [...room.players.values()].filter((p) => p.connected !== false).slice(0, 3);
