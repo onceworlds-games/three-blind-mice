@@ -316,7 +316,7 @@ export function createMouseModel(seat = 0) {
     scarf: patchEcho(std(color, { map: knitTex, roughness: 0.95, emissive: color, emissiveIntensity: 0.28 }), { rim: 0.45, cut: false }),
     lens: new THREE.MeshStandardMaterial({ color: 0x050508, roughness: 0.08, metalness: 0.5, side: THREE.DoubleSide }),
     frame: std(0x0e0e12, { roughness: 0.35 }),
-    gold: std(0xe0aa44, { roughness: 0.25, metalness: 0.95, emissive: 0x3a2200 }),
+    gold: std(0xf0bc4c, { roughness: 0.32, metalness: 0.35, emissive: 0x5a3a00 }),
     glint: new THREE.MeshBasicMaterial({ color: PALETTE.cream, toneMapped: false }),
     white: patchEcho(std(0xf6f2ea, { roughness: 0.9, emissive: 0x2a2826 }), { cut: false }),
     black: patchEcho(std(0x17151c, { roughness: 0.6 }), { rim: 0.3, cut: false }),
@@ -556,18 +556,20 @@ export function poseMouse(model, m, t, dt, reduced = false, fx = null) {
   model.skid = Math.max(0, model.skid - dt);
   const pitchTarget = (accel > 8 ? 0.12 : accel < -8 ? -0.2 : 0) + (m.charge > 0 ? 0.12 * m.charge : 0);
   model.pitch += (pitchTarget - model.pitch) * Math.min(1, dt * 8);
-  // Gait.
+  // Gait. Tiptoeing: low and long, slow high steps, ears flat (a cartoon sneak).
   const moving = speed > 0.15;
-  model.phase += dt * (moving ? 6 + speed * 5.5 : 0);
-  const stride = Math.min(1, speed / 2.6);
+  model.tip = (model.tip ?? 0) + ((m.tiptoe ?? 0) - (model.tip ?? 0)) * Math.min(1, dt * 8);
+  const tip = out ? 0 : model.tip;
+  model.phase += dt * (moving ? (6 + speed * 5.5) * (1 - tip * 0.45) : 0);
+  const stride = Math.min(1, speed / 2.6) + tip * 0.6;
   for (let i = 0; i < 4; i++) {
     const f = model.feet[i];
     const ph = model.phase + (i === 0 || i === 3 ? 0 : Math.PI);
     const sw = Math.sin(ph);
     const lift = Math.max(0, Math.cos(ph));
-    f.mesh.position.set(f.x + (moving && !reduced ? sw * 0.07 * stride : 0), 0.025 + (moving && !reduced ? lift * 0.05 * stride : 0), f.z);
+    f.mesh.position.set(f.x + (moving && !reduced ? sw * 0.07 * stride : 0), 0.025 + (moving && !reduced ? lift * (0.05 + tip * 0.05) * stride : 0), f.z);
   }
-  const bob = moving && !reduced ? Math.abs(Math.sin(model.phase)) * 0.025 * (0.4 + stride) : 0;
+  const bob = moving && !reduced ? Math.abs(Math.sin(model.phase)) * 0.025 * (0.4 + stride) * (1 - tip * 0.6) : 0;
   // Squeak: rear up (small) or burst from a crouch (big).
   model.squeakT += dt;
   const sq = model.squeakT < 0.45 ? Math.sin((model.squeakT / 0.45) * Math.PI) : 0;
@@ -576,14 +578,14 @@ export function poseMouse(model, m, t, dt, reduced = false, fx = null) {
   const hop = Math.sin(model.hop * Math.PI) * 0.16;
   const crouch = m.charge > 0 ? m.charge * 0.06 : 0;
   const shiver = m.charge >= 1 && !reduced ? Math.sin(t * 70) * 0.01 : 0;
-  model.body.position.set(0, bob + hop - crouch + shiver, 0);
+  model.body.position.set(0, bob + hop - crouch + shiver - tip * 0.045, 0);
   const sqs = reduced ? 0 : model.squash;
-  model.body.scale.set(1 + sqs, 1 - sqs * 0.9, 1 - sqs * 0.3);
+  model.body.scale.set(1 + sqs + tip * 0.08, 1 - sqs * 0.9 - tip * 0.12, 1 - sqs * 0.3);
   model.lean.rotation.x = reduced ? 0 : model.leanA;
   model.body.rotation.z = -rear + (reduced ? 0 : -model.pitch * 0.6) + (moving ? -0.05 : 0);
   // Head: sniffing when still, forward when running, up when squeaking.
   const sniff = !moving && !reduced ? Math.sin(t * 13) * 0.025 * (0.5 + 0.5 * Math.sin(t * 0.7)) : 0;
-  model.head.rotation.z = (moving ? -0.12 : Math.sin(t * 1.3 + model.seat) * 0.08) + rear * 0.7 + sniff;
+  model.head.rotation.z = (moving ? -0.12 : Math.sin(t * 1.3 + model.seat) * 0.08) + rear * 0.7 + sniff - tip * 0.12;
   model.head.rotation.y = moving || reduced ? 0 : Math.sin(t * 0.8 + model.seat * 2) * 0.35;
   const ns = 1 + (sniff ? Math.abs(Math.sin(t * 26)) * 0.18 : 0);
   model.nose.scale.set(0.032 * ns, 0.028 * ns, 0.034 * ns);
@@ -596,7 +598,7 @@ export function poseMouse(model, m, t, dt, reduced = false, fx = null) {
   model.earTwitch = Math.max(0, model.earTwitch - dt * 6);
   model.ears.forEach((e, i) => {
     const side = i ? 1 : -1;
-    e.rotation.z = 0.2 + (moving ? 0.5 * stride : 0) + (i === 0 ? model.earTwitch * 0.35 : 0) - rear * 0.25;
+    e.rotation.z = 0.2 + (moving ? 0.5 * Math.min(1, stride) : 0) + (i === 0 ? model.earTwitch * 0.35 : 0) - rear * 0.25 + tip * 0.45;
     e.rotation.x = side * (0.35 + (moving ? 0.15 * stride : 0));
   });
   model.whiskers.rotation.y = !reduced ? Math.sin(t * 9) * 0.06 : 0;

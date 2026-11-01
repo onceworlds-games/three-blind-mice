@@ -17,6 +17,8 @@ const TUNE = [
   [E4, 3], [D4, 3], [C4, 6],
 ];
 const BASS = [36, 43, 36, 43, 43, 36, 43, 36, 36, 43, 36, 43, 36, 43, 41, 43, 36, 36];
+// A chain of crumbs climbs this scale.
+const PENTA = [76, 79, 81, 84, 86, 88, 91, 93, 96, 98, 100, 103];
 const MINOR = new Map([[64, 63], [69, 68], [71, 70], [76, 75]]);
 
 export function createAudio() {
@@ -348,6 +350,61 @@ export function createAudio() {
     whistle() {
       tone('sine', 2200, 500, T(), 0.5, 0.07);
     },
+    // A crumb: a tiny crunch and a plink that climbs the scale with the chain.
+    crumb({ chain = 1, mult = 1 } = {}) {
+      const t = T();
+      const n = PENTA[Math.min(PENTA.length - 1, Math.max(0, chain - 1))];
+      noise(t, 0.035, 0.07, 'highpass', 3500, 5000, 1);
+      tone('sine', MIDI(n), MIDI(n) * 1.01, t + 0.01, 0.16, 0.11 + mult * 0.012);
+      if (mult >= 3) tone('triangle', MIDI(n + 12), MIDI(n + 12), t + 0.03, 0.12, 0.05);
+      if (mult >= 5) bell(MIDI(n + 7), t + 0.05, 0.5, 0.05);
+    },
+    // The chain lost: a soft falling blip.
+    chainEnd() {
+      tone('sine', 700, 380, T(), 0.12, 0.05);
+    },
+    shave() {
+      const t = T();
+      noise(t, 0.28, 0.12, 'bandpass', 3000, 900, 2);
+      tone('triangle', MIDI(84), MIDI(91), t + 0.05, 0.22, 0.1);
+    },
+    tally() {
+      const t = T();
+      tone('square', 1300, 1300, t, 0.025, 0.04);
+      tone('sine', 2600, 2600, t + 0.02, 0.05, 0.05);
+    },
+    bonus() {
+      const t = T();
+      box(MIDI(84), t, 0.14, sfxBus, 0.6);
+      box(MIDI(91), t + 0.07, 0.12, sfxBus, 0.6);
+    },
+    medal({ n = 0 } = {}) {
+      const t = T();
+      if (!n) return tone('sine', 300, 200, t, 0.3, 0.08);
+      const base = [0, 67, 72, 79][n];
+      [0, 4, 7, 12].forEach((d, i) => bell(MIDI(base + d), t + i * 0.08, 1.4, 0.07 + n * 0.015));
+      noise(t, 0.6, 0.04 * n, 'highpass', 6000, 9000, 1, sfxBus, 0.01);
+    },
+    levelup() {
+      const t = T();
+      [72, 76, 79, 84].forEach((n, i) => box(MIDI(n), t + i * 0.05, 0.15, sfxBus, 0.8));
+      bell(MIDI(96), t + 0.22, 1.2, 0.06);
+    },
+    unlock() {
+      const t = T();
+      noise(t, 0.4, 0.06, 'bandpass', 2000, 8000, 3);
+      [79, 83, 86, 91].forEach((n, i) => bell(MIDI(n), t + 0.1 + i * 0.06, 0.9, 0.05));
+    },
+    goal() {
+      const t = T();
+      box(MIDI(79), t, 0.16, sfxBus, 0.8);
+      box(MIDI(84), t + 0.1, 0.16, sfxBus, 0.8);
+      box(MIDI(88), t + 0.2, 0.18, sfxBus, 1.2);
+    },
+    golden() {
+      const t = T();
+      [84, 88, 91, 96, 100].forEach((n, i) => bell(MIDI(n), t + i * 0.05, 1.0, 0.05));
+    },
   };
 
   a.play = (name, opts) => {
@@ -366,6 +423,11 @@ export function createAudio() {
   let nextT = 0;
   let phraseOn = true;
   let beatT = 0;
+  // How far the night has come (cheese home, time gone): the band joins in as it builds.
+  let build = 0;
+  a.build = (u) => {
+    build = Math.max(0, Math.min(1, u));
+  };
   const eighth = () => (60 / 84 / 2) * (danger > 0.5 ? 1.25 : 1);
   a.music = (m) => {
     if (m === mode) return;
@@ -394,8 +456,17 @@ export function createAudio() {
             tone('triangle', MIDI(b), MIDI(b), nextT, 0.5, 0.12, musicBus, 0.004);
           }
         }
-        // While playing: the tune comes and goes in fragments.
-        if (mode === 'play' && step % 12 === 11) phraseOn = Math.random() < 0.45;
+        // As the night builds: a plucked bass, then a brushed shaker, then the tune whole.
+        if (mode === 'play' && danger <= 0.5) {
+          if (build > 0.2 && step % 3 === 0) {
+            const b = BASS[Math.floor(step / 3) % BASS.length];
+            tone('triangle', MIDI(b), MIDI(b) * 0.995, nextT, 0.28, 0.07 + build * 0.05, musicBus, 0.003);
+          }
+          if (build > 0.5 && step % 2 === 1) noise(nextT, 0.05, 0.018 + build * 0.012, 'highpass', 7000, 7000, 1, musicBus, 0.002);
+          if (build > 0.75 && note && step % 6 === 0) box(MIDI(note + 19), nextT, 0.04, musicBus, 0.6);
+        }
+        // While playing: the tune comes and goes in fragments (more of it as the night builds).
+        if (mode === 'play' && step % 12 === 11) phraseOn = Math.random() < 0.45 + build * 0.45;
         nextT += eighth() * len;
         step++;
       }

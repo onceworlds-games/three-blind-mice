@@ -10,7 +10,7 @@ import { createPost } from './post.js';
 import { createMouseModel, poseMouse, popTail, squeakPose, addMouse, glowTexture } from './mouse.js';
 import { createHuman, poseHuman, addHuman } from './humans.js';
 import { createCat, poseCat, addCat } from './cat.js';
-import { createWedge, createWheel, createTrap, poseTrap, createCrumbs } from './items.js';
+import { createWedge, createWheel, createTrap, poseTrap, createCrumbs, gild } from './items.js';
 import { createFx } from './fx.js';
 import { cookieTexture } from './textures.js';
 import { setAnisotropy } from './assets.js';
@@ -197,6 +197,7 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
     }
     v.items = world.items.map((it) => {
       const m = it.k === 'W' ? createWheel() : createWedge();
+      if (it.gold) gild(m);
       actorGroup.add(m.root, m.glow);
       return m;
     });
@@ -286,6 +287,12 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
     v.slowUntil = v.slowFrom + seconds * 1000;
   };
   v.burst = (x, z, n = 60) => fx.confetti(x, 0.5, z, n);
+  // A crumb into a mouth: a puff of crumbs and a glint, bigger with the chain.
+  v.crumbPop = (x, z, mult = 1, color = 0xffd23f) => {
+    if (v.reduced) return;
+    fx.crumbs(x, 0.12, z, 4 + mult * 2, color);
+    fx.glint(x, 0.25, z, color, 0.35 + mult * 0.1);
+  };
 
   // ------------------------------------------------------------ the camera
   function viewDistance(span) {
@@ -314,6 +321,20 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
         yaw = v.reduced ? 0 : Math.sin(vm.now * 0.12) * 0.1;
         pitch = PITCH + 0.1;
       }
+    } else if (v.mode === 'wardrobe' && vm.focus) {
+      // Close on your mouse, from the front, a little low, turning slowly; it sits clear of the wardrobe's panel.
+      const f = vm.focus;
+      const portrait = v.w < v.h;
+      span = portrait ? 1.9 : 2.4;
+      pitch = PITCH - 0.32;
+      yaw = Math.atan2(Math.cos(f.a), Math.sin(f.a)) + (v.reduced ? 0 : Math.sin(vm.now * 0.35) * 0.5);
+      // Screen right (landscape) or down (portrait) in world terms, so the panel covers the far side.
+      const rx = Math.cos(yaw);
+      const rz = -Math.sin(yaw);
+      const dx = -Math.sin(yaw);
+      const dz = -Math.cos(yaw);
+      c.tx = f.x + (portrait ? -dx * span * 0.95 : rx * span * 0.3);
+      c.tz = f.z + (portrait ? -dz * span * 0.95 : rz * span * 0.3);
     } else if (v.mode === 'poster') {
       follow = false;
       const p = v.posterCam;
@@ -365,6 +386,11 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
         }
       }
       if (v.mode === 'attract') span = 15;
+      else {
+        // Never wider than the whole room: the dark outside is never the picture.
+        const aspect = v.w / v.h;
+        span = Math.min(span, aspect < 1 ? Math.max(world.W, world.D * aspect) * 0.98 : Math.max(world.D * 0.9, world.W / aspect) * 0.98);
+      }
       c.tx = fx0;
       c.tz = fz0;
       // Keep the view on the room: no more of the dark outside than the room needs (the floor seen nearer the camera
@@ -542,7 +568,7 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
     });
     if (v.crumbs) {
       const list = v.crumbs.list;
-      const got = vm.data?.cr;
+      const got = vm.cr ?? vm.data?.cr;
       for (const r of vm.rings) {
         const def = RINGS[r.kind];
         if (!def?.heard || now - r.t > def.dur + 0.1) continue;
@@ -709,7 +735,8 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
         model.root.rotation.y = carried ? -(carrier?.a ?? 0) : (v.reduced ? 0 : t * 0.4) + i;
         model.body.rotation.z = carried && !v.reduced ? Math.sin(t * 13) * 0.08 : 0;
       }
-      const glow = 0.1 + Math.min(1, model.ping / 1.5) * 0.5 + (carried ? 0.15 : 0);
+      if (model.gold && !v.reduced && Math.random() < dt * 6) fx.glint(it.x + (Math.random() - 0.5) * 0.5, 0.2 + Math.random() * 0.4, it.z + (Math.random() - 0.5) * 0.5, 0xffe08a, 0.25);
+      const glow = (model.gold ? 0.3 : 0.1) + Math.min(1, model.ping / 1.5) * 0.5 + (carried ? 0.15 : 0);
       model.mat.emissiveIntensity = glow;
       if (model.mat2) model.mat2.emissiveIntensity = glow;
       model.glow.position.set(it.x, 0.03, it.z);
@@ -725,7 +752,7 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
       }
       poseTrap(m, sprung, dt, v.reduced);
     });
-    v.crumbs?.update(vm.data?.cr, dt);
+    v.crumbs?.update(vm.cr ?? vm.data?.cr, dt, f && f.st === 'play' ? f.x : -99, f && f.st === 'play' ? f.z : -99);
     // Lights that follow: whisker glow on the focused mouse; the hole's breathing warmth; the stove's flicker.
     if (f && f.st !== 'watch') {
       whisker.position.set(f.x, 1.1, f.z);

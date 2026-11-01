@@ -36,16 +36,20 @@ before it has to be found.
 | | Keyboard | Phone |
 |---|---|---|
 | Move | WASD or the arrows | The platform's stick (`stick: 'analog'`, `zone: 'wide'`) |
+| Tiptoe (silent) | Hold Shift | Tilt the stick a little |
 | Small squeak | Tap Space (let go within 0.3 s) | Tap **Squeak** (the big button) |
 | Big squeak | Hold Space: a ring preview grows around your mouse; let go once it's full (0.7 s) | Hold **Squeak** |
 | Pick up cheese | Automatic: touch it | Automatic |
 | Drop cheese | E | **Drop** (the second button, only shown while carrying) |
 | Menus | Click, Enter, Space; R again, M map, N next night on results | Tap |
-| Glasses (lobby) | G, or click your mouse | Tap your mouse |
+| Daily Raid | D (title; the host in the lobby) | Tap **Raid** |
+| Wardrobe (lobby) | G, or click your mouse or your level | Tap your mouse or your level |
 | Pause (alone only) | P or Esc | The platform's menu pauses |
 
-The stick's tilt sets the speed (0.3 to 1 of full, full past 80%), so a phone player can creep; the keyboard is always full
-speed. Nothing else: one action button and one that only exists while it's needed.
+The stick's tilt sets the speed (0.3 to 1 of full, full past 80%), so a phone player can creep; on a keyboard Shift
+creeps (0.42 of full). At 1.5 u/s or slower a mouse **tiptoes**: no floor noise at all (creaky boards, crumbs, pans), a
+lower, slower, stretched gait with high paw lifts, and a paw icon on the HUD. Nothing else: one action button and one that
+only exists while it's needed.
 
 ## The core loop and where mastery comes from
 
@@ -74,6 +78,23 @@ light and the noise, repeat for every wedge before dawn.
 - **The night ends** when all the cheese is home, at dawn, or when every mouse still playing has been in the hole for 4 s
   with at least one wedge home (a ring of light fills the hole's arch while they wait; stepping out cancels it; hint the
   first time: **Wait in the hole**). Nobody is ever "game over" mid-night: a hit costs time, cheese and a star.
+
+### Crumbs and the chain
+
+Every night is strewn with crumbs (20-40, placed by a seeded flood-fill over the open floor so every page agrees). A mouse
+eats one by touching it: 10 points times the chain. Each crumb within 2.5 s of the last raises the chain (×1 … ×5); the
+HUD's ring drains the 2.5 s, the pop over the crumb grows with the multiplier and the plink climbs a scale. Crumbs glint
+faintly when a ring has shown them, so a big squeak paints a route; chaining them pulls you off the safe line, into her
+light and over creaky boards. That's the tension: the score lives where the danger is.
+
+### Score and medals
+
+The score at dawn: cheese home (wedge 500, golden wedge 1500, wheel 1500) + every mouse's crumbs, and, only if something
+came home, bonuses: **Every tail** 600, **Unseen** 800 (nobody spotted), **Quiet feet** 400 (no floor noise, on nights that
+have creaky floor), **Close shaves** 100 each (up to 8), **Every crumb** 500, **Quick paws** up to 1000 (full at the night's
+par time, none at twice par). Medals per night: bronze = all the cheese's worth; silver = cheese + 30% of the best chain
+score + 45% of the bonuses; gold = cheese + 60% + 80%. Bot sims (`calib.mjs`): a careful autopilot mostly lands silver,
+gold needs chains, no spotting and speed.
 
 ### Stars (per night)
 
@@ -178,13 +199,25 @@ Built on the SDK helpers: `createMatch` (rounds: 1, introSeconds 2.5, roundEndSe
 
 ## Progression and reasons to come back
 
-- **Stars** per night (36 in all), shown on the map and the title.
-- **Best times** per night (all the cheese) and fewest squeaks, on the map's night card and the results.
-- **Glasses** for your mouse, unlocked by total stars, worn in co-op for everyone to see: Round (0), Cat-eye (6),
-  Aviators (12), Stars (18), Monocle (24), Hearts (30), Gold Rounds (36). Picked in the lobby by tapping your mouse.
-- **Leaderboards:** `night-1` … `night-12` (fastest full clear, seconds, lower is better) and `stars` (total). 13 boards.
-- **Saves** (`ow.save`): `progress` = `{ v, stars[12], best[12], fewest[12], glasses, hints{} }`, written at each night's end
-  and on a glasses change. In co-op every mouse earns the night's stars and times in its own save.
+Short, mid and long goals, all earned by playing (nothing to buy, no ads):
+
+- **Each night (short):** the score counted up line by line, the medal bar with its three marks, a best score to beat.
+- **Each day (mid):** three **daily goals** (an easy, a middling and a hard one, picked by the date from what you have
+  open: "Eat 40 crumbs", "2 close shaves", "Win a gold medal" …), 150 XP each (more on a streak) and 250 for all three; the
+  **Daily Raid**: one remixed night for everyone that day (`daily.js`: a night from 2-12 with a twist: Prowling cat, Creaky
+  night, Golden wedge, Crumb feast or Early dawn), with today's board on the title and in the lobby; the **streak** of days
+  played (a flame on the title).
+- **Long:** **mouse level** (XP = a tenth of the score + 50 for cheese home + medal bonus, ×1.5 on the raid; level L→L+1
+  takes 200 + 60(L-1)), one wardrobe item at every level to 45 (11 hats, 7 glasses, 8 furs, 6 sparkles), tried on in the
+  wardrobe before they're yours; **medals** on all twelve nights (gold everywhere is the mastery goal); badges.
+- **Leaderboards:** `score-1` … `score-12` (best score per night) and `stars`; the old `night-1` … `night-12` (fastest full
+  clear) stay. 25 boards, the platform's limit.
+- **Game data** (`onceworlds.json` `data`): `raid`, a list of the last 100 raid scores `{ d: day, s: score, n: night }`
+  pushed when a player beats their own best for the day (read, validated and filtered to today by `raidboard.js`), and
+  `raiders`, a daily counter of players who raided.
+- **Saves** (`ow.save` `progress`, version 2): stars, best times, fewest squeaks, best scores and medals per night, XP, the
+  look worn, today's goals and raid best, the streak, lifetime totals, hints seen. A version 1 save carries over (its
+  stars become XP). Everything is cleaned on load; a look beyond the level is taken off.
 
 ### Badges
 
@@ -200,6 +233,17 @@ Built on the SDK helpers: `createMatch` (rounds: 1, introSeconds 2.5, roundEndSe
 | `whole-wheel` | The Whole Wheel | Roll a whole wheel home |
 | `see-how-they-run` | See How They Run | Three mice home together with all the cheese |
 | `farmhouse` | Farmhouse | Clear all twelve nights |
+| `crumb-hoover` | Crumb Hoover | Eat 30 crumbs in one night |
+| `chain-gang` | Chain Gang | Chain 10 crumbs without a break |
+| `ghost` | Ghost | Finish a night without being seen |
+| `quiet-feet` | Quiet Feet | Cross a creaky night without a creak |
+| `gold-medal` | Gold | Win a gold medal |
+| `all-gold` | All Gold | Gold on all twelve nights |
+| `daily-bread` | Daily Bread | Bring cheese home on a Daily Raid |
+| `week-streak` | Seven Nights | Play seven days in a row |
+| `goal-getter` | Goal Getter | Finish all three of the day's goals |
+| `level-10` | Level 10 | Reach mouse level 10 |
+| `level-25` | Level 25 | Reach mouse level 25 |
 
 ## Balance and timing
 

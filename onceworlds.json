@@ -1,7 +1,7 @@
 {
   "slug": "three-blind-mice",
   "name": "Three Blind Mice",
-  "description": "You can't see. Squeak to see. Steal the cheese, get home, keep your tail.",
+  "description": "You can't see. Squeak to see. Steal the cheese, chain the crumbs, get home with your tail. Twelve nights, a new Daily Raid every day, medals to win and a mouse to dress.",
   "dir": "dist",
   "productionBranch": "main",
   "genre": "Adventure",
@@ -21,6 +21,12 @@
         "D"
       ],
       "action": "Sneak (or the arrow keys)"
+    },
+    {
+      "keys": [
+        "Shift"
+      ],
+      "action": "Hold: tiptoe, silent on creaky boards"
     },
     {
       "keys": [
@@ -49,9 +55,15 @@
     },
     {
       "keys": [
+        "D"
+      ],
+      "action": "Daily Raid (title, lobby)"
+    },
+    {
+      "keys": [
         "G"
       ],
-      "action": "Change glasses (lobby)"
+      "action": "Wardrobe (lobby)"
     },
     {
       "keys": [
@@ -127,6 +139,85 @@
       "name": "Farmhouse",
       "description": "Clear all twelve nights",
       "icon": "store/badge-farmhouse.png"
+    },
+    {
+      "id": "crumb-hoover",
+      "name": "Crumb Hoover",
+      "description": "Eat 30 crumbs in one night",
+      "icon": "store/badge-crumb-hoover.png"
+    },
+    {
+      "id": "chain-gang",
+      "name": "Chain Gang",
+      "description": "Chain 10 crumbs without a break",
+      "icon": "store/badge-chain-gang.png"
+    },
+    {
+      "id": "ghost",
+      "name": "Ghost",
+      "description": "Finish a night without being seen",
+      "icon": "store/badge-ghost.png"
+    },
+    {
+      "id": "quiet-feet",
+      "name": "Quiet Feet",
+      "description": "Cross a creaky night without a creak",
+      "icon": "store/badge-quiet-feet.png"
+    },
+    {
+      "id": "gold-medal",
+      "name": "Gold",
+      "description": "Win a gold medal",
+      "icon": "store/badge-gold-medal.png"
+    },
+    {
+      "id": "all-gold",
+      "name": "All Gold",
+      "description": "Gold on all twelve nights",
+      "icon": "store/badge-all-gold.png"
+    },
+    {
+      "id": "daily-bread",
+      "name": "Daily Bread",
+      "description": "Bring cheese home on a Daily Raid",
+      "icon": "store/badge-daily-bread.png"
+    },
+    {
+      "id": "week-streak",
+      "name": "Seven Nights",
+      "description": "Play seven days in a row",
+      "icon": "store/badge-week-streak.png"
+    },
+    {
+      "id": "goal-getter",
+      "name": "Goal Getter",
+      "description": "Finish all three of the day's goals",
+      "icon": "store/badge-goal-getter.png"
+    },
+    {
+      "id": "level-10",
+      "name": "Level 10",
+      "description": "Reach mouse level 10",
+      "icon": "store/badge-level-10.png"
+    },
+    {
+      "id": "level-25",
+      "name": "Level 25",
+      "description": "Reach mouse level 25",
+      "icon": "store/badge-level-25.png"
     }
-  ]
+  ],
+  "data": {
+    "raid": {
+      "type": "list",
+      "max": 100,
+      "bytes": 160
+    },
+    "raiders": {
+      "type": "counter",
+      "max": 1000000,
+      "add": 1,
+      "reset": "daily"
+    }
+  }
 }

@@ -11,7 +11,7 @@ import { createCat, poseCat } from './render/cat.js';
 import { createHuman } from './render/humans.js';
 import { loadProps } from './render/assets.js';
 import { SEAT_CSS, seatSvg, echo } from './render/echo.js';
-import { starSvg } from './ui.js';
+import { starSvg, medalSvg } from './ui.js';
 
 const W = innerWidth;
 const H = innerHeight;
@@ -192,7 +192,8 @@ function studio() {
     pitch: 0.62,
     mouse(seat, x, z, a, extra = {}) {
       const model = createMouseModel(seat);
-      poseMouse(model, { x, z, a, speed: 0, st: 'play', tail: 1, g: 0, carry: '', stun: 0, charge: 0, me: false, away: false, ...extra }, 1.2 + seat, 1 / 30, true);
+      // Posed a few times over so the blended parts (tiptoe, ears) settle.
+      for (let i = 0; i < 12; i++) poseMouse(model, { x, z, a, speed: 0, st: 'play', tail: 1, g: 0, carry: '', stun: 0, charge: 0, me: false, away: false, ...extra }, 1.2 + seat, 1 / 30, true);
       model.halo.visible = false;
       model.shadow.visible = false;
       addMouse(scene, model);
@@ -251,6 +252,17 @@ const BADGES = {
   'whole-wheel': { accent: '#FFD23F', rings: 2 },
   'see-how-they-run': { accent: '#6FE0B0', rings: 2 },
   farmhouse: { accent: '#F4A835', rings: 0, stars: 12 },
+  'crumb-hoover': { accent: '#FFD23F', rings: 0, crumbs: 22 },
+  'chain-gang': { accent: '#FFD23F', rings: 0, crumbs: 10, arc: true, text: '×10' },
+  ghost: { accent: '#9FD8FF', rings: 2, dashed: true, eye: true },
+  'quiet-feet': { accent: '#9FD8FF', rings: 0, paws: true },
+  'gold-medal': { accent: '#FFD23F', rings: 1, medals: [3] },
+  'all-gold': { accent: '#FFD23F', rings: 0, medals: Array(12).fill(3) },
+  'daily-bread': { accent: '#FFD23F', rings: 0, sun: true },
+  'week-streak': { accent: '#FF9A3C', rings: 0, flame: 7 },
+  'goal-getter': { accent: '#6FE0B0', rings: 1, checks: 3 },
+  'level-10': { accent: '#F4A835', rings: 1, text: '10' },
+  'level-25': { accent: '#FFD23F', rings: 2, text: '25' },
 };
 
 function badge(id) {
@@ -269,6 +281,55 @@ function badge(id) {
       const a = (i / b.stars) * Math.PI * 2 - Math.PI / 2;
       const s = W * 0.075;
       deco += `<g transform="translate(${cx + Math.cos(a) * R * 0.8 - s / 2} ${cy + Math.sin(a) * R * 0.8 - s / 2}) scale(${s / 24})"><path d="M12 1.8l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 17.9l-6.4 3.5 1.4-7.1-5.3-5 7.2-.9z" fill="#FFD23F"/></g>`;
+    }
+  }
+  // Crumbs: scattered round the rim, or an arc that climbs (a chain).
+  if (b.crumbs) {
+    for (let i = 0; i < b.crumbs; i++) {
+      const u = i / b.crumbs;
+      const a = b.arc ? Math.PI * (0.92 + u * 0.9) : u * Math.PI * 2 + (i % 3) * 0.07;
+      const rr = R * (b.arc ? 0.74 : 0.72 + ((i * 7) % 5) * 0.035);
+      const sz = W * (b.arc ? 0.016 + u * 0.016 : 0.018);
+      deco += `<ellipse cx="${cx + Math.cos(a) * rr}" cy="${cy + Math.sin(a) * rr}" rx="${sz * 1.2}" ry="${sz}" fill="${b.accent}" transform="rotate(${i * 47} ${cx + Math.cos(a) * rr} ${cy + Math.sin(a) * rr})"/>`;
+    }
+  }
+  if (b.text) deco += `<text x="${cx + R * 0.58}" y="${cy + R * 0.72}" text-anchor="middle" font-family="Alfa Slab One" font-size="${W * 0.15}" fill="${b.accent}" stroke="#0C0D18" stroke-width="${W * 0.012}" paint-order="stroke">${b.text}</text>`;
+  if (b.eye) deco += `<g transform="translate(${cx + R * 0.52} ${cy - R * 0.52})" stroke="${b.accent}" stroke-width="${W * 0.014}" fill="none" stroke-linecap="round"><path d="M${-W * 0.07} 0 Q0 ${W * 0.05} ${W * 0.07} 0"/><path d="M${-W * 0.04} ${W * 0.025} l${-W * 0.015} ${W * 0.025} M0 ${W * 0.036} v${W * 0.028} M${W * 0.04} ${W * 0.025} l${W * 0.015} ${W * 0.025}"/></g>`;
+  if (b.paws) {
+    for (let i = 0; i < 5; i++) {
+      const x = cx - R * 0.7 + i * R * 0.34;
+      const y = cy + R * 0.62 + (i % 2 ? -R * 0.08 : R * 0.08);
+      deco += `<g transform="translate(${x} ${y}) scale(${W / 200})" fill="${b.accent}" opacity="${0.35 + i * 0.13}"><ellipse cx="0" cy="3" rx="3.2" ry="4"/><circle cx="-3.6" cy="-3" r="1.5"/><circle cx="0" cy="-4.4" r="1.5"/><circle cx="3.6" cy="-3" r="1.5"/></g>`;
+    }
+  }
+  if (b.medals) {
+    const n = b.medals.length;
+    const s = W * (n === 1 ? 0.26 : 0.09);
+    b.medals.forEach((m, i) => {
+      const a = n === 1 ? -Math.PI / 4 : (i / n) * Math.PI * 2 - Math.PI / 2;
+      const rr = n === 1 ? R * 0.55 : R * 0.8;
+      deco += `<g transform="translate(${cx + Math.cos(a) * rr - s / 2} ${cy + Math.sin(a) * rr - s * 0.6})">${medalSvg(m, s)}</g>`;
+    });
+  }
+  if (b.sun) {
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      deco += `<path d="M${cx + Math.cos(a) * R * 0.66} ${cy + Math.sin(a) * R * 0.66} L${cx + Math.cos(a) * R * 0.82} ${cy + Math.sin(a) * R * 0.82}" stroke="${b.accent}" stroke-opacity="0.7" stroke-width="${W * 0.022}" stroke-linecap="round"/>`;
+    }
+  }
+  if (b.flame) {
+    for (let i = 0; i < b.flame; i++) {
+      const a = Math.PI * (0.15 + (i / (b.flame - 1)) * 0.7);
+      deco += `<circle cx="${cx + Math.cos(a) * R * 0.76}" cy="${cy + Math.sin(a) * R * 0.76}" r="${W * 0.026}" fill="${b.accent}" stroke="#0C0D18" stroke-width="${W * 0.006}"/>`;
+    }
+    deco += `<g transform="translate(${cx + R * 0.5} ${cy - R * 0.5}) scale(${W / 160})"><path d="M0 -13 C5 -6 8 -2 8 3 A8 8 0 0 1 -8 3 C-8 -1 -5 -4 -3 -8 C-2 -4 0 -3 1 -2 C2 -6 1 -9 0 -13Z" fill="#FF9A3C" stroke="#FFD23F" stroke-width="1.4"/><path d="M0 -3 C3 1 4 3 3 6 A3 3 0 0 1 -3 6 C-4 3 -2 1 0 -3Z" fill="#FFF1D6"/></g>`;
+  }
+  if (b.checks) {
+    for (let i = 0; i < b.checks; i++) {
+      const a = Math.PI * (1.1 + i * 0.4);
+      const x = cx + Math.cos(a) * R * 0.74;
+      const y = cy + Math.sin(a) * R * 0.74;
+      deco += `<circle cx="${x}" cy="${y}" r="${W * 0.055}" fill="#0C0D18" stroke="${b.accent}" stroke-width="${W * 0.012}"/><path d="M${x - W * 0.028} ${y} l${W * 0.02} ${W * 0.02} l${W * 0.035} ${-W * 0.04}" fill="none" stroke="${b.accent}" stroke-width="${W * 0.014}" stroke-linecap="round" stroke-linejoin="round"/>`;
     }
   }
   if (b.zzz) {
@@ -333,6 +394,44 @@ function badge(id) {
     [0, 1, 2].forEach((seat) => st.mouse(seat, -0.55 + seat * 0.55, 0.22 - seat * 0.22, FACING - 1.2, { speed: 1, g: [0, 2, 5][seat] }));
     st.distance = 4.8;
     st.look.set(0, 0.25, 0);
+  } else if (id === 'crumb-hoover' || id === 'chain-gang') {
+    st.mouse(0, 0, 0, FACING - 0.3, { speed: id === 'chain-gang' ? 1.2 : 0, look: { g: 0, h: 0, f: 1, t: 0 } });
+    st.distance = 2.6;
+    st.look.set(0.02, 0.27, 0);
+  } else if (id === 'ghost' || id === 'quiet-feet') {
+    st.mouse(id === 'ghost' ? 2 : 1, 0, 0, FACING - 0.9, { speed: 0.9, tiptoe: 1, look: { g: id === 'ghost' ? 4 : 0, h: 0, f: id === 'ghost' ? 2 : 3, t: 0 } });
+    st.distance = 2.8;
+    st.look.set(0.02, 0.25, 0);
+  } else if (id === 'gold-medal') {
+    st.mouse(0, -0.12, 0, FACING - 0.25, { look: { g: 6, h: 0, f: 5, t: 0 } });
+    st.distance = 2.7;
+    st.look.set(-0.05, 0.28, 0);
+  } else if (id === 'all-gold') {
+    st.mouse(0, 0, 0, FACING, { look: { g: 6, h: 10, f: 5, t: 0 } });
+    st.distance = 2.9;
+    st.look.set(0, 0.34, 0);
+  } else if (id === 'daily-bread') {
+    st.mouse(1, -0.2, 0, FACING - 0.5, { look: { g: 0, h: 1, f: 1, t: 0 } });
+    const w = st.wedge(0.34, 0.1, 0.22, 0.7, 0.95);
+    w.mat.color.setHex(0xffd54a);
+    st.distance = 3.3;
+    st.look.set(0.05, 0.27, 0.05);
+  } else if (id === 'week-streak') {
+    st.mouse(2, -0.1, 0, FACING - 0.35, { look: { g: 2, h: 3, f: 4, t: 0 } });
+    st.distance = 2.8;
+    st.look.set(0, 0.3, 0);
+  } else if (id === 'goal-getter') {
+    st.mouse(0, 0.12, 0, FACING + 0.3, { look: { g: 3, h: 6, f: 0, t: 0 } });
+    st.distance = 2.9;
+    st.look.set(0.08, 0.33, 0);
+  } else if (id === 'level-10') {
+    st.mouse(1, -0.15, 0, FACING - 0.3, { look: { g: 1, h: 3, f: 1, t: 0 } });
+    st.distance = 2.8;
+    st.look.set(-0.05, 0.3, 0);
+  } else if (id === 'level-25') {
+    st.mouse(0, -0.15, 0, FACING - 0.3, { look: { g: 2, h: 7, f: 4, t: 0 } });
+    st.distance = 3.0;
+    st.look.set(-0.05, 0.33, 0);
   } else if (id === 'farmhouse') {
     const w = createWheel();
     w.root.scale.setScalar(0.7);

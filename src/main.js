@@ -5,23 +5,29 @@ import '@fontsource/alfa-slab-one/400.css';
 import '@fontsource/barlow/600.css';
 import '@fontsource/barlow/700.css';
 import './style.css';
+import './meta.css';
 import { createMatch, createHost, t } from '@onceworlds/sdk/match';
 import { createView } from './render/view.js';
 import { loadProps } from './render/assets.js';
 import { createUI } from './ui.js';
 import { createAudio } from './audio.js';
-import { createSession, viewFromSim, makeRing, STEP } from './core/session.js';
+import { createSession, viewFromSim, makeRing, worldFor, STEP } from './core/session.js';
 import { createSim } from './core/sim.js';
 import { soloRoom } from './core/localroom.js';
 import { NIGHT_COUNT } from './core/levels.js';
 import { carrying } from './core/night.js';
 import { createBrain, think } from './core/autopilot.js';
 import { createRng } from './core/rng.js';
-import { holeMouth } from './core/mouse.js';
+import { holeMouth, MOUSE } from './core/mouse.js';
+import { CRUMB, chainMult } from './core/crumbs.js';
+import { medalsFor, SCORE } from './core/score.js';
+import { dayKey, dailyNight, dailyPlan, TWISTS } from './core/daily.js';
 import { RINGS, ringReachTime } from './core/rings.js';
 import { SEAT_CSS } from './render/echo.js';
-import { GLASSES, unlockedAt } from './looks.js';
-import { cleanProgress, loadProgress, mergeProgress, saveProgress, totalStars, unlockedNights, recordNight, levelOf } from './progress.js';
+import { UNLOCKS, unlockedAt, KINDS } from './looks.js';
+import { cleanProgress, loadProgress, mergeProgress, saveProgress, totalStars, unlockedNights, recordNight, levelOf, ensureDay, liveStreak, wearable } from './progress.js';
+import { goalLabel } from './goals.js';
+import { raidTop } from './raidboard.js';
 import { createHints } from './hints.js';
 
 const ow = window.onceworlds ?? null;
@@ -76,12 +82,19 @@ async function boot() {
   };
   setTimeout(loaded, 15000);
   const hints = createHints(progress, persist);
+  // Today, by the platform's clock (the same day for everyone, UTC).
+  // day=YYYYMMDD (local captures only): pretend it's that day.
+  const FAKE_DAY = LOCAL ? Number(q.get('day')) || 0 : 0;
+  const today = () => FAKE_DAY || dayKey(safe(() => ow?.now?.()) ?? Date.now());
+  // Today's raid board (the game's shared list, filtered to today), read now and then.
+  const raidBoard = { day: 0, top: [], raiders: 0, at: 0 };
   loadProgress(ow).then((p) => {
     const late = progressLoaded;
     mergeProgress(progress, p);
+    progress.look = wearable(progress.look, levelOf(progress.xp).level);
     loaded();
-    if (late) persist();
-    ui.title({ stars: totalStars(progress) });
+    if (ensureDay(progress, today()) || late) persist();
+    refreshTitle();
   });
   const reduced = () => view.reduced;
 
@@ -100,9 +113,14 @@ async function boot() {
   let room = null;
   let session = null;
   let wantQuick = 0;
+  let wantRaid = false;
   function makeSession() {
     session?.dispose();
     session = createSession({ room, createMatch, createHost, t, unlocked: () => Math.max(unlockedNights(progress), ENV_NIGHT), look: () => progress.look, firstPick: ENV_NIGHT || 1 });
+    if (wantRaid) {
+      wantRaid = false;
+      if (!session.quickRaid(today())) session.setPick(0, today());
+    }
     session.match.on('results', () => onResults());
     room.on('close', (reason) => onClosed(reason));
   }
@@ -118,42 +136,109 @@ async function boot() {
   let screen = 'title';
   let shownPhase = '';
   const ui = createUI({
-    sfx: (n) => audio.play(n),
+    sfx: (n, o) => audio.play(n, o),
     reduced,
     onPlay: () => play(),
-    onPick: (n) => session?.setPick(n),
+    onRaid: () => play(true),
+    onPick: (n, raid) => (raid ? session?.setPick(0, today()) : session?.setPick(n)),
+    onWardrobe: (on) => setWardrobe(on),
+    onWear: (kind, id) => wear(kind, id),
+    onTry: (kind, id) => tryOn(kind, id),
     onReady: () => session?.ready(!room.me?.ready),
     onStart: () => session?.start(),
     onInvite: () => safe(() => ow?.ui?.showInvite?.()),
-    onGlasses: () => cycleGlasses(),
     onNext: () => resultsAction('next'),
     onAgain: () => resultsAction('again'),
     onMap: () => resultsAction('map'),
     onJoinIn: () => session?.joinIn(),
   });
-  ui.title({ stars: totalStars(progress) });
+  refreshTitle();
   ui.show('title');
   document.body.dataset.flow = 'title';
   safe(() => ow?.ui?.setLook?.({ accent: '#F4A835', panel: '#14131F', text: '#FFF1D6' }));
   safe(() => ui.layout((ow && ow.ui && ow.ui.reserved) || null));
   safe(() => ow?.on?.('reserved', (a) => ui.layout(a)));
 
-  function cycleGlasses() {
-    const level = levelOf(progress.xp).level;
-    const owned = GLASSES.map((g, i) => (unlockedAt('glasses', i, level) ? i : -1)).filter((i) => i >= 0);
-    const at = owned.indexOf(progress.look.g);
-    progress.look.g = owned[(at + 1) % owned.length] ?? 0;
-    persist();
-    audio.play('click');
+  // ------------------------------------------------------------ the wardrobe
+  let dressing = false;
+  // A locked item tried on in the wardrobe: only this page's picture wears it, never the save or the room.
+  let trying = null;
+  const LOOK_KEY = { glasses: 'g', hat: 'h', fur: 'f', trail: 't' };
+  const drawWardrobe = () => ui.wardrobe(dressing ? { level: levelOf(progress.xp).level, look: progress.look, trying } : null);
+  function setWardrobe(on) {
+    dressing = !!on && screen === 'game' && session?.phase === 'lobby';
+    trying = null;
+    drawWardrobe();
+    audio.play(dressing ? 'whistle' : 'click');
   }
+  function wear(kind, id) {
+    const key = LOOK_KEY[kind];
+    if (!key || !unlockedAt(kind, id, levelOf(progress.xp).level)) return;
+    progress.look = { ...progress.look, [key]: id };
+    trying = null;
+    persist();
+    audio.play('nibble');
+    view.punchIn?.(0.4);
+    if (dressing) drawWardrobe();
+  }
+  function tryOn(kind, id) {
+    if (!LOOK_KEY[kind] || !KINDS[kind]?.[id]) return;
+    trying = trying?.kind === kind && trying.id === id ? null : { kind, id };
+    audio.play('tap');
+    drawWardrobe();
+  }
+  const lookShown = () => (trying ? { ...progress.look, [LOOK_KEY[trying.kind]]: trying.id } : progress.look);
 
-  function play() {
+  // ------------------------------------------------------------ the title's meta: level, streak, goals, today's raid
+  function readRaidBoard(force = false) {
+    const day = today();
+    if (!ow?.data?.game?.get || (!force && raidBoard.day === day && performance.now() - raidBoard.at < 30000)) return;
+    raidBoard.at = performance.now();
+    Promise.resolve(safe(() => ow.data.game.get('raid')))
+      .then((list) => {
+        raidBoard.day = day;
+        raidBoard.top = raidTop(list, day, room?.me?.id ?? '');
+        refreshTitle();
+      })
+      .catch(() => {});
+    Promise.resolve(safe(() => ow.data.game.get('raiders')))
+      .then((n) => {
+        if (Number.isFinite(n)) raidBoard.raiders = n;
+      })
+      .catch(() => {});
+  }
+  function raidInfo() {
+    const day = today();
+    const night = dailyNight(day);
+    if (!night) return null;
+    const plan = dailyPlan(day);
+    return { day, name: night.name, night: night.id, twist: TWISTS[plan.twist].name, tip: TWISTS[plan.twist].tip, best: progress.daily.day === day ? progress.daily.raid : 0, top: raidBoard.day === day ? raidBoard.top : [], raiders: raidBoard.raiders };
+  }
+  const twistText = (night) => (night?.twist && TWISTS[night.twist] ? `${TWISTS[night.twist].name} · ${TWISTS[night.twist].tip}` : '');
+  function goalsView(now = []) {
+    return progress.daily.day === today() ? progress.daily.goals.map((g) => ({ label: goalLabel(g.id), have: g.have, need: g.need, done: g.done, now: now.includes(g.id) })) : [];
+  }
+  function refreshTitle() {
+    ensureDay(progress, today());
+    const lv = levelOf(progress.xp);
+    ui.title({ level: lv.level, into: lv.into, need: lv.need, streak: liveStreak(progress, today()), daily: raidInfo(), goals: goalsView(), allDone: !!progress.daily.all });
+  }
+  readRaidBoard(true);
+
+  function play(raid = false) {
     audio.start();
     audio.music('menu');
-    const r = ui.playButton.getBoundingClientRect();
+    const r = (raid ? ui.raidButton : ui.playButton).getBoundingClientRect();
     ui.wipe(((r.left + r.width / 2) / window.innerWidth) * 100, ((r.top + r.height / 2) / window.innerHeight) * 100);
     screen = 'game';
     view.snapCamera();
+    // The Daily Raid: alone, straight in; with friends, it's the lobby's pick.
+    if (raid) {
+      if (session && room.match.phase === 'lobby' && room.isHost && room.online.length <= 1) session.quickRaid(today());
+      else if (session && room.isHost) session.setPick(0, today());
+      else if (!session) wantRaid = true;
+      return;
+    }
     // Alone with nothing played yet: straight into Night 1. Anyone else lands in the lobby (or watches a night under way).
     if (AUTO_TO === 'lobby') return;
     const want = AUTO ? Number(q.get('night')) || ENV_NIGHT || 1 : ENV_NIGHT || 1;
@@ -172,7 +257,8 @@ async function boot() {
     const r = session.result();
     if (!r) return;
     // Next only after a night with cheese home (it's what opens the next one); otherwise it means Again, as the big button says.
-    if (what === 'next' && r.home > 0 && r.night < NIGHT_COUNT) session.next(r.night + 1);
+    if (r.day && what !== 'map') session.next(r.night, r.day === today() ? r.day : today());
+    else if (what === 'next' && r.home > 0 && r.night < NIGHT_COUNT) session.next(r.night + 1);
     else if (what === 'next') session.next(r.night);
     else if (what === 'again') session.next(r.night);
     else session.toMap();
@@ -197,6 +283,7 @@ async function boot() {
         e.preventDefault();
         play();
       }
+      if (k === 'd') play(true);
       return;
     }
     if (!session) return;
@@ -206,9 +293,14 @@ async function boot() {
       return;
     }
     if (phase === 'lobby') {
+      if (dressing) {
+        if (k === 'Escape' || k === 'Enter' || k === 'g') setWardrobe(false);
+        return;
+      }
       if (k === 'Enter') room.isHost ? session.start() : session.ready(!room.me?.ready);
-      if (k === 'g') cycleGlasses();
-      if (room.isHost && (k === 'ArrowLeft' || k === 'ArrowRight')) session.setPick(session.pick() + (k === 'ArrowLeft' ? -1 : 1));
+      if (k === 'g') setWardrobe(true);
+      if (k === 'd' && room.isHost) session.setPick(0, today());
+      if (room.isHost && (k === 'ArrowLeft' || k === 'ArrowRight')) session.setPick(session.pickDay() ? 1 : session.pick() + (k === 'ArrowLeft' ? -1 : 1));
     } else if (phase === 'round' || phase === 'intro') {
       if (k === 'e') input.drop = true;
       if (k === 'p' || k === 'Escape') pause();
@@ -240,6 +332,11 @@ async function boot() {
     if (l > 1) {
       ix /= l;
       iz /= l;
+    }
+    // Shift: tiptoe (slow enough to be silent).
+    if (keys.has('Shift')) {
+      ix *= MOUSE.creep;
+      iz *= MOUSE.creep;
     }
     input.ix = ix;
     input.iz = iz;
@@ -319,6 +416,7 @@ async function boot() {
   function resetNightStats() {
     nightStats.squeaks = 0;
     nightStats.catWoke = false;
+    nightStats.spotted = false;
     nightStats.myRings = [];
   }
   const awarded = new Set();
@@ -327,20 +425,56 @@ async function boot() {
     awarded.add(id);
     safe(() => ow?.badges?.award?.(id)?.catch?.(() => {}));
   };
+  // What the last night did to this player's progress, for the results screen (kept per round).
+  let lastRec = null;
   function onResults() {
     const r = session.result();
     if (!r || !room.isParticipant?.(room.me.id)) return;
+    if (lastRec?.roundId === session.roundId) return;
     const mine = r.rows.find((x) => x.me);
+    const day = today();
     const before = totalStars(progress);
-    recordNight(progress, r, nightStats.squeaks);
+    const xpBefore = levelOf(progress.xp);
+    const firstRaid = !!r.day && (progress.daily.day !== day || progress.daily.raid === 0);
+    const rec = recordNight(progress, r, nightStats.squeaks, day);
+    const xpAfter = levelOf(progress.xp);
     persist();
+    lastRec = {
+      roundId: session.roundId,
+      rec,
+      level: { from: xpBefore.level, to: xpAfter.level, into: xpAfter.into, need: xpAfter.need, before: xpBefore.into / xpBefore.need },
+      unlocked: UNLOCKS.filter((u) => u.level > xpBefore.level && u.level <= xpAfter.level).map((u) => ({ kind: u.kind, id: u.id })),
+      goals: goalsView(rec.goals),
+    };
+    const sc = r.score;
+    // Badges.
     if (r.home > 0 && mine?.tail) award('still-got-it');
     if (r.stars.all && nightStats.squeaks <= 5) award('silent-run');
-    if (r.night === 5 && r.home > 0 && !nightStats.catWoke) award('let-sleeping-cats-lie');
+    if (r.night === 5 && r.home > 0 && !nightStats.catWoke && !r.day) award('let-sleeping-cats-lie');
     if (r.stars.all && r.rows.length >= 3) award('see-how-they-run');
-    if (progress.stars.every((s) => s > 0)) award('farmhouse');
-    if (r.stars.all) safe(() => ow?.leaderboards?.submit?.(`night-${r.night}`, Math.round(r.time * 10) / 10, { lowerIsBetter: true })?.catch?.(() => {}));
+    if (progress.stars.every((v) => v > 0)) award('farmhouse');
+    if ((r.mine?.crumbs ?? 0) >= 30) award('crumb-hoover');
+    if ((r.mine?.chain ?? 0) >= 10) award('chain-gang');
+    if (sc?.lines?.some((l) => l.id === 'unseen')) award('ghost');
+    if (sc?.lines?.some((l) => l.id === 'quiet')) award('quiet-feet');
+    if (sc?.medal === 3) award('gold-medal');
+    if (progress.medal.every((v) => v === 3)) award('all-gold');
+    if (r.day && sc?.counts) award('daily-bread');
+    if (liveStreak(progress, day) >= 7) award('week-streak');
+    if (rec.allGoals) award('goal-getter');
+    if (xpAfter.level >= 10) award('level-10');
+    if (xpAfter.level >= 25) award('level-25');
+    // Boards: each night's best score; the stars; today's raid on the game's shared list.
+    if (!r.day && sc?.counts) safe(() => ow?.leaderboards?.submit?.(`score-${r.night}`, sc.total)?.catch?.(() => {}));
     if (totalStars(progress) > before) safe(() => ow?.leaderboards?.submit?.('stars', totalStars(progress))?.catch?.(() => {}));
+    if (r.day && r.day === day && sc) {
+      if (firstRaid) safe(() => ow?.data?.game?.add?.('raiders', 1)?.catch?.(() => {}));
+      if (rec.raidBest && sc.total > 0) {
+        Promise.resolve(safe(() => ow?.data?.game?.push?.('raid', { d: day, s: sc.total, n: r.night })))
+          .then(() => readRaidBoard(true))
+          .catch(() => {});
+      }
+    }
   }
 
   // ------------------------------------------------------------ sound and juice from what happened
@@ -424,6 +558,19 @@ async function boot() {
         }
         case 'closeShave':
           award('close-shave');
+          audio.play('shave');
+          ui.call(`Close shave +${SCORE.shave}`);
+          break;
+        case 'crumb':
+          if (f.mine) {
+            audio.play('crumb', { chain: f.chain, mult: f.mult });
+            view.crumbPop(f.x, f.z, f.mult);
+            view.project(f.x, 0.35, f.z, proj);
+            if (proj.on) ui.pop(proj.x, proj.y, `+${f.pts}`, f.mult >= 5 ? 'x5' : f.mult >= 3 ? 'x3' : '');
+            if (f.chain === 1) hints.show('chain');
+            if (f.chain >= 3) hints.done('chain');
+            if (f.chain === 10) ui.call('Chain 10!', 'gold');
+          } else view.crumbPop(f.x, f.z, 1, 0xd8b98a);
           break;
         case 'mode':
           if (f.k === 'cat') {
@@ -434,7 +581,13 @@ async function boot() {
             if (f.m === 'crouch') audio.play('hiss');
           } else {
             if (f.m === 'hear') audio.play('hm');
-            if (f.m === 'spot') audio.play('gasp');
+            if (f.m === 'spot') {
+              audio.play('gasp');
+              if (f.tgt === room.me.id && !nightStats.spotted) {
+                nightStats.spotted = true;
+                ui.call('Spotted', 'warn');
+              }
+            }
             if (f.m === 'raise') audio.play('whoosh', { dur: 0.8 });
             if (f.was === 'wait') {
               audio.play('door');
@@ -465,6 +618,7 @@ async function boot() {
           break;
         case 'roundStart':
           resetNightStats();
+          ui.resetScore();
           audio.music('play');
           break;
       }
@@ -486,6 +640,7 @@ async function boot() {
     const s = Math.min(hx / Math.max(1e-3, Math.abs(dx)), hy / Math.max(1e-3, Math.abs(dy)));
     return { x: cx + dx * s, y: cy + dy * s, ang: Math.atan2(dy, dx) };
   }
+  let lastChain = 0;
   function hudState(vm, { watching, canJoin }) {
     const d = vm.data;
     const me = vm.mice.find((m) => m.me);
@@ -551,8 +706,30 @@ async function boot() {
       }
     }
     audio.danger(danger);
+    // The night's score as it stands: the cheese home and everyone's crumbs. The chain: this mouse's.
+    let score = 0;
+    let homeN = 0;
+    if (d) {
+      for (const it of d.it) if (it.home) {
+        score += it.k === 'W' ? SCORE.wheel : it.gd ? SCORE.gold : SCORE.wedge;
+        homeN++;
+      }
+      for (const id in d.mice) score += d.mice[id].pt || 0;
+    }
+    const chain = { n: 0, mult: 1, left: 0 };
+    if (vm.me && vm.me.chain) {
+      chain.n = vm.me.chain;
+      chain.left = 1 - (vm.now - vm.me.chainT) / CRUMB.gap;
+    } else if (me && d?.mice[me.id]) {
+      chain.n = d.mice[me.id].ch;
+      chain.left = 1 - (vm.now - d.mice[me.id].ct) / CRUMB.gap;
+    }
+    chain.mult = chainMult(chain.n);
+    if (chain.left <= 0 && lastChain > 2) audio.play('chainEnd');
+    lastChain = chain.left > 0 ? chain.n : 0;
+    audio.build(d ? Math.max(frac * 0.8, d.it.length ? homeN / d.it.length : 0) : 0);
     const note = !watching && room?.spectators?.length ? `${room.spectators.map((p) => p.name).join(', ')} watching` : '';
-    return { timeLeft, frac, items: d ? d.it : [], tags, arrows, out, rest, chase, watching, canJoin, hint: hints.current, note };
+    return { timeLeft, frac, items: d ? d.it : [], score, chain, tiptoe: me?.tiptoe ?? 0, tags, arrows, out, rest, chase, watching, canJoin, hint: hints.current, note };
   }
 
   // Hints: once each, saved; again only for a player who seems stuck.
@@ -602,7 +779,7 @@ async function boot() {
     view.mode = 'intro';
     view.introStart();
     ui.show('intro');
-    ui.intro(simGame.sim.world.night);
+    ui.intro(simGame.sim.world.night, twistText(simGame.sim.world.night));
     if (q.get('skipintro')) {
       simGame.phase = 'round';
       view.mode = q.get('cam') === 'wide' ? 'attract' : 'follow';
@@ -698,7 +875,7 @@ async function boot() {
       screen = 'game';
       return;
     }
-    if (AUTO && !SIM_MODE && AUTO_TO !== 'title' && performance.now() > 1500) play();
+    if (AUTO && !SIM_MODE && AUTO_TO !== 'title' && performance.now() > 1500) play(!!q.get('raid'));
     if (AUTO_TO === 'lobby' && performance.now() > 1200) play();
   }
 
@@ -727,7 +904,7 @@ async function boot() {
         shownPhase = 'lobby';
         ui.show('lobby');
         audio.music('menu');
-        view.mode = 'orbit';
+        view.mode = dressing ? 'wardrobe' : 'orbit';
         view.snapCamera();
         lobbyRings = [];
         lobbyT = 0;
@@ -739,6 +916,12 @@ async function boot() {
         }
       }
       lobbyT += dt;
+      // dress=1 (local captures): the wardrobe opens once the lobby is up.
+      if (LOCAL && q.get('dress') && !dressing && lobbyT > 0.5 && lobbyT < 0.6) {
+        setWardrobe(true);
+        const [k, id] = String(q.get('try') ?? '').split(':');
+        if (k) tryOn(k, Number(id));
+      }
       if (lobbyT >= nextLobbyRing) {
         const w = s.world;
         const [hx, hz] = holeMouth(w);
@@ -747,28 +930,46 @@ async function boot() {
         nextLobbyRing = lobbyT + 3.2;
       }
       if (view.world !== s.world) lobbyRings = lobbyRings.filter((r) => r.kind === 'midnight').map((r) => ({ ...r, t: lobbyT }));
-      vm = { world: s.world, data: null, mice: s.mice, items: s.items, rings: lobbyRings, hunters: [], now: lobbyT, focus: null };
+      const mine = s.mice.find((m) => m.me) ?? null;
+      let mice = s.mice;
+      if (trying && mine) {
+        const lk = lookShown();
+        mice = s.mice.map((m) => (m.me ? { ...m, look: lk, g: lk.g } : m));
+      }
+      vm = { world: s.world, data: null, mice, items: s.items, rings: lobbyRings, hunters: [], now: lobbyT, focus: dressing ? mine : null };
+      view.mode = dressing && mine ? 'wardrobe' : 'orbit';
       const players = [...room.players.values()].filter((p) => p.connected !== false).slice(0, 3);
+      const pickDay = s.pickDay();
+      const lv = levelOf(progress.xp);
+      const raid = pickDay ? raidInfo() : null;
       ui.lobby({
         pick: s.pick(),
+        raid: raid ? { twist: `${raid.twist}: ${raid.tip}`, best: raid.best, top: raid.top } : null,
+        raidOk: room.isHost || !!pickDay,
         unlocked: room.isHost ? unlockedNights(progress) : NIGHT_COUNT,
         stars: progress.stars,
-        best: progress.best,
+        medals: progress.medal,
+        scores: progress.score,
+        thresholds: pickDay ? null : medalsFor(worldFor(s.pick(), 0)),
+        level: lv.level,
+        into: lv.into,
+        need: lv.need,
         isHost: room.isHost,
         canStart: !!room.canStart,
         waitingFor: (room.notReady ?? []).map((p) => p.name),
         ready: !!room.me?.ready,
         hostName: room.players.get(room.host)?.name ?? 'the host',
         inviteable: !!ow?.ui?.showInvite && room.kind === 'private',
-        seats: players.map((p) => ({ id: p.id, name: p.name, me: p.id === room.me.id, host: p.id === room.host, ready: !!p.ready, g: p.id === room.me.id ? progress.look.g : (p.presence?.g ?? 0), avatar: avatars.get(p.id) ?? null })),
+        seats: players.map((p) => ({ id: p.id, name: p.name, me: p.id === room.me.id, host: p.id === room.host, ready: !!p.ready, avatar: avatars.get(p.id) ?? null })),
       });
       players.forEach((p) => fetchAvatar(p.id));
       setControls(null);
     } else if (phase === 'intro') {
       if (shownPhase !== 'intro') {
         shownPhase = 'intro';
+        if (dressing) setWardrobe(false);
         ui.show('intro');
-        ui.intro(s.world.night);
+        ui.intro(s.world.night, twistText(s.world.night));
         view.mode = 'intro';
         view.introStart();
         audio.music('quiet');
@@ -810,16 +1011,10 @@ async function boot() {
         ui.show('results');
         view.mode = 'burrow';
         audio.music('menu');
-        const best = progress.best[r.night - 1] || 0;
-        ui.results({ ...r, all: r.stars.all, best, isHost: room.isHost, next: r.night < NIGHT_COUNT, hostName: room.players.get(room.host)?.name ?? 'the host' });
-        const got = [r.stars.home, r.stars.all, r.stars.tails];
-        got.forEach((on, i) =>
-          setTimeout(() => {
-            if (!on) return;
-            ui.resultStar(i, true);
-            audio.play('star', { n: i });
-          }, 500 + i * 450),
-        );
+        if (lastRec?.roundId !== s.roundId) onResults();
+        const mineRec = lastRec?.roundId === s.roundId ? lastRec : null;
+        ui.results({ ...r, nightName: s.world.night.name, rec: mineRec?.rec ?? null, level: mineRec?.level ?? null, unlocked: mineRec?.unlocked ?? [], goals: mineRec?.goals ?? [], isHost: room.isHost, next: r.night < NIGHT_COUNT, hostName: room.players.get(room.host)?.name ?? 'the host' });
+        if (r.score?.medal === 3) view.addTrauma(0.25);
       }
       if (r) vm = { ...s, burrow: { wedges: s.data.it.filter((i) => i.home && i.k === 'w').length, wheel: s.data.it.some((i) => i.home && i.k === 'W'), mice: r.rows.map((row) => ({ seat: row.seat, tail: row.tail, g: row.look?.g ?? 0, look: row.look })) } };
       setControls(null);
@@ -905,7 +1100,7 @@ async function boot() {
     view.render(vm, dt);
   }
 
-  function simSounds(events) {
+  function simSounds(events, sim = simGame.sim) {
     for (const e of events) {
       if (e.type === 'ring') {
         const r = e.ring;
@@ -913,6 +1108,16 @@ async function boot() {
         else if (['creak', 'crumbs', 'pan', 'rumble'].includes(r.kind)) audio.play(r.kind);
         else if (r.kind === 'chime') audio.play('chime');
         else if (r.kind === 'snore') audio.play('snore');
+      } else if (e.type === 'crumb') {
+        const m = sim.mice.findIndex((x) => x.id === e.id);
+        const c = sim.world.crumbs[e.i];
+        if (m === simFocus && c) {
+          const mult = chainMult(e.ch);
+          audio.play('crumb', { chain: e.ch, mult });
+          view.crumbPop(c[0], c[1], mult);
+          view.project(c[0], 0.35, c[1], proj);
+          if (proj.on) ui.pop(proj.x, proj.y, `+${CRUMB.pts * mult}`, mult >= 5 ? 'x5' : mult >= 3 ? 'x3' : '');
+        } else if (c) view.crumbPop(c[0], c[1], 1, 0xd8b98a);
       } else if (e.type === 'grab') audio.play('nibble');
       else if (e.type === 'home') audio.play('home');
       else if (e.type === 'hit') {

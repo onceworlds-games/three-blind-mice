@@ -53,6 +53,21 @@ export function createWedge() {
   return { root, body, mesh: m, mat: paste, mat2: rind, glow, ping: 0, k: 'w', spin: 0, lx: NaN, lz: NaN, wob: 0 };
 }
 
+// The Daily Raid's golden wedge: the same wedge, gilded.
+export function gild(model) {
+  for (const m of [model.mat, model.mat2]) {
+    m.color.setHex(0xffd54a);
+    m.metalness = 0.4;
+    m.roughness = 0.3;
+    m.emissive.setHex(0x8a5a00);
+    m.emissiveIntensity = 0.55;
+    m.needsUpdate = true;
+  }
+  model.glow.material.color.setHex(0xc89a20);
+  model.gold = true;
+  return model;
+}
+
 // The wheel: rind round the sides, paste faces, a paper label on one face.
 export function createWheel() {
   const rind = cheese().rind();
@@ -152,7 +167,7 @@ export function poseTrap(model, sprung, dt, reduced = false) {
 // ---------------------------------------------------------------- crumbs: invisible until a squeak's light finds them
 
 const crumbGeo = (() => {
-  const g = new THREE.DodecahedronGeometry(0.09, 0);
+  const g = new THREE.DodecahedronGeometry(0.11, 0);
   const p = g.attributes.position;
   for (let i = 0; i < p.count; i++) p.setY(i, p.getY(i) * 0.6);
   g.translate(0, 0.05, 0);
@@ -193,14 +208,18 @@ export function createCrumbs(list) {
   mesh.instanceMatrix.needsUpdate = true;
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   const glints = new Float32Array(list.length);
+  const known = new Float32Array(list.length);
+  const shown = new Float32Array(list.length);
   const zero = new THREE.Matrix4().makeScale(0, 0, 0);
   return {
     mesh,
     list,
     glints,
+    known,
     taken: new Uint8Array(list.length),
-    // got: which are gone; dt: frame step; t: time (for the bob).
-    update(got, dt) {
+    // got: which are gone; dt: frame step; (fx, fz): the focused mouse, whose whiskers find crumbs right under its nose.
+    // A crumb a ring found flares, then stays faintly lit (remembered) for a while.
+    update(got, dt, fx = -99, fz = -99) {
       let dirty = false;
       let cdirty = false;
       for (let i = 0; i < list.length; i++) {
@@ -210,10 +229,19 @@ export function createCrumbs(list) {
           for (let k = 0; k < 3; k++) mesh.setMatrixAt(i * 3 + k, gone ? zero : base[i * 3 + k]);
           dirty = true;
         }
-        if (glints[i] > 0 || this.lastGlint?.[i] > 0) {
-          glints[i] = Math.max(0, glints[i] - dt * 0.6);
-          const g = glints[i];
-          for (let k = 0; k < 3; k++) mesh.setColorAt(i * 3 + k, color.setRGB(0.05 + g * 1.4, 0.04 + g * 1.0, 0.02 + g * 0.3));
+        if (gone) continue;
+        if (glints[i] > 0) {
+          glints[i] = Math.max(0, glints[i] - dt * 0.7);
+          known[i] = 1;
+        } else known[i] = Math.max(0, known[i] - dt / 14);
+        const dx = list[i][0] - fx;
+        const dz = list[i][1] - fz;
+        const near = Math.max(0, 1 - Math.sqrt(dx * dx + dz * dz) / 1.9);
+        const want = glints[i] * 1.5 + Math.max(known[i] * 0.42, near * 0.7);
+        if (Math.abs(want - shown[i]) > 0.01) {
+          shown[i] = want;
+          const g = want;
+          for (let k = 0; k < 3; k++) mesh.setColorAt(i * 3 + k, color.setRGB(0.05 + g * 1.3, 0.04 + g * 0.95, 0.02 + g * 0.32));
           cdirty = true;
         }
       }

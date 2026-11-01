@@ -184,3 +184,15 @@ test('hints: short, one at a time, each once, remembered', () => {
   for (let i = 0; i < 100; i++) h.tick(0.1);
   assert.notEqual(h.current, HINTS.squeak, 'never again');
 });
+
+test("today's raid board: only today's sane entries, each player's best once, best first", async () => {
+  const { raidTop } = await import('../src/raidboard.js');
+  const day = 20261101;
+  const e = (id, s, d = day, name = id) => ({ value: { d, s, n: 7 }, by: { id, name }, at: 1 });
+  const list = [e('a', 3000), e('b', 4200), e('a', 5100), e('c', 9e9), e('d', -4), e('e', 2500, 20261031), e('f', NaN), { value: 'x', by: { id: 'g' } }, null, { value: { d: day, s: 100 } }, e('h', 2000, day, '')];
+  const top = raidTop(list, day, 'b');
+  assert.deepEqual(top.map((t) => [t.name, t.score]), [['a', 5100], ['b', 4200], ['Mouse', 2000]]);
+  assert.equal(top[1].me, true);
+  assert.deepEqual(raidTop('junk', day), []);
+  assert.equal(raidTop(Array.from({ length: 40 }, (_, i) => e(`p${i}`, i * 10)), day).length, 10);
+});
