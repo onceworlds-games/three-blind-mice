@@ -3,11 +3,14 @@
 
 import { MOUSE, holeMouth } from './mouse.js';
 import { clearAt } from './world.js';
+import { CRUMB, chainMult } from './crumbs.js';
 
 export const REST_SECONDS = 4;
 export const AWAY_DROP_SECONDS = 4;
 
-const newMouse = () => ({ tail: 1, out: 0, safe: 0, home: 0, hits: 0 });
+// Per mouse: tail, knocked out until, safe until, cheese home, hits; crumbs (count, points, chain, last at, best chain);
+// times spotted, close shaves, and whether it made a floor noise.
+const newMouse = () => ({ tail: 1, out: 0, safe: 0, home: 0, hits: 0, cr: 0, pt: 0, ch: 0, ct: -99, bc: 0, sp: 0, cs: 0, nz: 0 });
 
 export function createNight(world, ids, now) {
   const mice = {};
@@ -17,8 +20,10 @@ export function createNight(world, ids, now) {
     lv: world.night.id,
     t0: now,
     dawn: now + world.night.dawn,
-    it: world.items.map((i) => ({ k: i.k, x: i.x, z: i.z, by: '', h: [], home: 0 })),
+    it: world.items.map((i) => ({ k: i.k, x: i.x, z: i.z, by: '', h: [], home: 0, gd: i.gold ? 1 : 0 })),
     mice,
+    cr: world.crumbs.map(() => 0),
+    dy: world.night.daily ?? 0,
     tr: world.traps.map(() => 0),
     g: 0,
     end: '',
@@ -113,6 +118,45 @@ export function snap(data, i) {
   return true;
 }
 
+// A crumb into mouse id's mouth. Returns '' when it worked, or why not.
+export function takeCrumb(data, world, i, id, x, z, now) {
+  const c = world.crumbs[i];
+  const m = data.mice[id];
+  if (!c || !m || i >= data.cr.length) return 'no such crumb';
+  if (data.cr[i]) return 'gone';
+  if (m.out > now) return 'out';
+  if (!(Math.abs(x - c[0]) <= CRUMB.reach + 0.35 && Math.abs(z - c[1]) <= CRUMB.reach + 0.35)) return 'too far';
+  data.cr[i] = 1;
+  m.ch = now - m.ct <= CRUMB.gap ? m.ch + 1 : 1;
+  m.ct = now;
+  m.cr += 1;
+  m.pt += CRUMB.pts * chainMult(m.ch);
+  m.bc = Math.max(m.bc, m.ch);
+  return '';
+}
+
+export const crumbsLeft = (data) => data.cr.reduce((n, v) => n + (v ? 0 : 1), 0);
+
+// Things the host notes for the score: she saw this mouse, a strike missed it by a whisker, it made a floor noise.
+export function noteSpot(data, id) {
+  const m = data.mice[id];
+  if (!m) return false;
+  m.sp = Math.min(999, m.sp + 1);
+  return true;
+}
+export function noteShave(data, id) {
+  const m = data.mice[id];
+  if (!m || m.cs >= 99) return false;
+  m.cs += 1;
+  return true;
+}
+export function noteNoise(data, id) {
+  const m = data.mice[id];
+  if (!m || m.nz) return false;
+  m.nz = 1;
+  return true;
+}
+
 export const allHome = (data) => data.it.length > 0 && data.it.every((i) => i.home);
 export const homeCount = (data) => data.it.filter((i) => i.home).length;
 
@@ -155,17 +199,24 @@ export function validNight(raw, world) {
   if (!raw || typeof raw !== 'object' || raw.v !== 1) return null;
   if (!num(raw.lv, 1, 99) || !num(raw.t0, -1e9, 1e9) || !num(raw.dawn, -1e9, 1e9)) return null;
   if (!Array.isArray(raw.it) || raw.it.length > 12 || !Array.isArray(raw.tr) || raw.tr.length > 32) return null;
+  const cr = raw.cr ?? [];
+  if (!Array.isArray(cr) || cr.length > 64) return null;
+  const dy = raw.dy ?? 0;
+  if (!num(dy, 0, 99999999) || !Number.isInteger(dy)) return null;
   if (!raw.mice || typeof raw.mice !== 'object' || Object.keys(raw.mice).length > 8) return null;
   const it = [];
   for (const i of raw.it) {
     if (!i || (i.k !== 'w' && i.k !== 'W') || !num(i.x, 0, world.W) || !num(i.z, 0, world.D) || !str(i.by) || !Array.isArray(i.h) || i.h.length > 2 || !i.h.every((h) => str(h))) return null;
-    it.push({ k: i.k, x: i.x, z: i.z, by: i.by, h: [...i.h], home: i.home ? 1 : 0 });
+    it.push({ k: i.k, x: i.x, z: i.z, by: i.by, h: [...i.h], home: i.home ? 1 : 0, gd: i.gd ? 1 : 0 });
   }
   const mice = {};
   for (const [id, m] of Object.entries(raw.mice)) {
     if (!str(id) || !m || typeof m !== 'object') return null;
     if (!num(m.out, -1e9, 1e9) || !num(m.safe, -1e9, 1e9) || !num(m.home, 0, 99) || !num(m.hits, 0, 999)) return null;
-    mice[id] = { tail: m.tail ? 1 : 0, out: m.out, safe: m.safe, home: m.home, hits: m.hits };
+    const opt = (v, lo, hi, d = 0) => (v === undefined ? d : num(v, lo, hi) ? v : NaN);
+    const more = { cr: opt(m.cr, 0, 64), pt: opt(m.pt, 0, 99999), ch: opt(m.ch, 0, 64), ct: opt(m.ct, -1e9, 1e9, -99), bc: opt(m.bc, 0, 64), sp: opt(m.sp, 0, 999), cs: opt(m.cs, 0, 99) };
+    if (Object.values(more).some((v) => Number.isNaN(v))) return null;
+    mice[id] = { tail: m.tail ? 1 : 0, out: m.out, safe: m.safe, home: m.home, hits: m.hits, ...more, nz: m.nz ? 1 : 0 };
   }
   return {
     v: 1,
@@ -175,6 +226,8 @@ export function validNight(raw, world) {
     it,
     mice,
     tr: raw.tr.map((t) => (t ? 1 : 0)),
+    cr: world.crumbs.map((_, i) => (cr[i] ? 1 : 0)),
+    dy,
     g: raw.g ? 1 : 0,
     end: ['all', 'dawn', 'rest'].includes(raw.end) ? raw.end : '',
     endAt: num(raw.endAt, -1e9, 1e9) ? raw.endAt : 0,

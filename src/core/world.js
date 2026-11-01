@@ -2,6 +2,7 @@
 // questions the rules ask of it (can a mouse or a hunter stand here, is this under cover, does the light reach, the way there).
 
 import { nightById } from './levels.js';
+import { placeCrumbs } from './crumbs.js';
 
 export const VOID = 0;
 export const WALL = 1;
@@ -115,6 +116,7 @@ export function buildWorld(nightOrId) {
     wife: null,
     farmer: null,
     cat: null,
+    crumbs: [],
     snore: null,
     clock: null,
     door: null,
@@ -129,7 +131,7 @@ export function buildWorld(nightOrId) {
       let dir = [0, 1];
       for (const d of [[0, 1], [0, -1], [-1, 0], [1, 0]]) if (info(o.x + d[0], o.z + d[1]).wall) { dir = d; break; }
       world.hole = { x: cx + dir[0] * 0.25, z: cz + dir[1] * 0.25, wx: dir[0], wz: dir[1], cx: o.x, cz: o.z };
-    } else if (o.ch === 'w') world.items.push({ k: 'w', x: cx, z: cz });
+    } else if (o.ch === 'w') world.items.push({ k: 'w', x: cx, z: cz, gold: (night.golden ?? []).includes(world.items.length) ? 1 : 0 });
     else if (o.ch === 'O') world.items.push({ k: 'W', x: cx, z: cz });
     else if (o.ch === 't') world.traps.push({ x: cx, z: cz });
     else if (o.ch === 'E') world.wife = { x: cx, z: cz };
@@ -153,6 +155,7 @@ export function buildWorld(nightOrId) {
   }
   if (world.snore === null && night.snore) world.snore = { x: W / 2, z: 2 };
   for (const mode of ['mouse', 'wheel', 'hunter', 'cat']) world.nav[mode] = buildNav(world, mode);
+  world.crumbs = placeCrumbs(world, night.daily ?? 0, night.feast ?? 1);
   return world;
 }
 

@@ -19,6 +19,8 @@ export const MOUSE = {
   bigCool: 1.2,
   bigHold: 0.3,
   bigFull: 0.7,
+  quiet: 1.5, // at or under this speed a mouse tiptoes: silent on creaky boards, crumbs and pans
+  creep: 0.42, // the tiptoe key's share of full speed
 };
 
 export const holeMouth = (world) => [world.hole.cx + 0.5, world.hole.cz + 0.5];
@@ -81,10 +83,12 @@ export function stepMouse(world, m, ix, iz, dt, maxSpeed, r = MOUSE.r, mode = 'm
   return bumped;
 }
 
-// The noise a moving mouse makes on creaky boards, crumbs or pans: a ring kind every 0.4 s, or null.
+// The noise a moving mouse makes on creaky boards, crumbs or pans: a ring kind every 0.4 s, or null. Tiptoeing (slower
+// than MOUSE.quiet) makes none.
+export const tiptoeing = (m) => Math.hypot(m.vx, m.vz) <= MOUSE.quiet;
 export function stepNoise(world, m, dt) {
   const kind = noiseAt(world, m.x, m.z);
-  const moving = Math.hypot(m.vx, m.vz) > 0.8;
+  const moving = !tiptoeing(m);
   if (!kind || !moving) {
     m.noiseT = Math.min(m.noiseT, 0.15);
     return null;

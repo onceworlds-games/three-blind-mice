@@ -9,9 +9,9 @@ import { starCount } from '../src/core/night.js';
 
 const finite = (...v) => v.every(Number.isFinite);
 
-function play(night, { mice = 1, seed = 1, skill = 0.85, careless = false, noisy = false } = {}) {
+function play(night, { mice = 1, seed = 1, skill = 0.85, careless = false, noisy = false, rush = false } = {}) {
   const ids = ['m1', 'm2', 'm3'].slice(0, mice);
-  const sim = createSim({ night: night.id, ids, seed, skill, careless, brains: !noisy, solo: mice === 1 });
+  const sim = createSim({ night: night.id, ids, seed, skill, careless, brains: !noisy, solo: mice === 1, rush });
   const brains = noisy ? ids.map((_, n) => createBrain({ skill, rng: createRng(seed * 31 + n) })) : null;
   let nextBig = 1;
   while (!sim.ended && sim.now < night.dawn + 2) {
@@ -48,9 +48,9 @@ for (const night of NIGHTS) {
   });
 }
 
-test('at its best the autopilot beats par on every night', () => {
+test('at its best the autopilot beats par on every night (a speedrun: no crumbs, no tiptoe)', () => {
   for (const night of NIGHTS) {
-    const sim = play(night, { mice: 1, seed: 3, skill: 1 });
+    const sim = play(night, { mice: 1, seed: 3, skill: 1, rush: true });
     assert.ok(sim.ended === 'all' && sim.now < night.par, `night ${night.id}: ${sim.ended} at ${sim.now.toFixed(1)}, par ${night.par}`);
   }
 });

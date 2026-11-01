@@ -5,7 +5,11 @@
 import { buildWorld } from './world.js';
 import { NIGHT_COUNT } from './levels.js';
 import { stepMouse, stepNoise, inHole, speedFor, wheelPush, wheelSlot, MOUSE, holeMouth, spawnPoint } from './mouse.js';
-import { createNight, addMouse, grab, drop, home, hit, snap, carrying, endCheck, restCheck, validNight, AWAY_DROP_SECONDS } from './night.js';
+import { createNight, addMouse, grab, drop, home, hit, snap, carrying, endCheck, restCheck, validNight, takeCrumb, noteSpot, noteShave, noteNoise, AWAY_DROP_SECONDS } from './night.js';
+import { CRUMB, chainMult } from './crumbs.js';
+import { scoreNight } from './score.js';
+import { dailyNight, validDay } from './daily.js';
+import { cleanLook } from '../looks.js';
 import { createHunters, tickHunters, strikeHits, packHunters, unpackHunters } from './hunters.js';
 import { RINGS, masked, maskingBetween } from './rings.js';
 import { createRng, hashSeed } from './rng.js';
@@ -18,11 +22,21 @@ const RING_KEEP = 9;
 const NOISES = ['creak', 'crumbs', 'pan', 'rumble', 'snap'];
 const STATES = ['play', 'hole', 'out', 'watch', 'join', 'lobby'];
 
+const FLOOR_NOISES = ['creak', 'crumbs', 'pan'];
+const KINDS = ['wife', 'farmer', 'cat'];
+
+// The world for night n, or for the Daily Raid of day dy (its remix of night n).
 const worlds = new Map();
-export function worldFor(n) {
+export function worldFor(n, dy = 0) {
   const id = Math.max(1, Math.min(NIGHT_COUNT, Math.floor(n) || 1));
-  if (!worlds.has(id)) worlds.set(id, buildWorld(id));
-  return worlds.get(id);
+  const day = validDay(dy) ? dy : 0;
+  const key = day ? `${id}:${day}` : String(id);
+  if (!worlds.has(key)) {
+    const night = day ? dailyNight(day) : null;
+    worlds.set(key, buildWorld(night && night.id === id ? night : id));
+    if (worlds.size > 20) for (const k of worlds.keys()) if (k.includes(':')) { worlds.delete(k); break; }
+  }
+  return worlds.get(key);
 }
 
 const finite = (v, lo, hi) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
@@ -54,7 +68,8 @@ export function readPresence(p, world) {
   if (!p || typeof p !== 'object') return null;
   const st = STATES.includes(p.st) ? p.st : null;
   if (!st) return null;
-  const out = { st, g: Number.isInteger(p.g) && p.g >= 0 && p.g < 8 ? p.g : 0, tl: p.tl === 0 ? 0 : 1, c: Number.isInteger(p.c) && p.c >= -1 && p.c < 12 ? p.c : -1 };
+  const lk = Array.isArray(p.lk) ? cleanLook({ g: p.lk[0], h: p.lk[1], f: p.lk[2], t: p.lk[3] }) : cleanLook({ g: p.g });
+  const out = { st, g: lk.g, lk, tl: p.tl === 0 ? 0 : 1, c: Number.isInteger(p.c) && p.c >= -1 && p.c < 12 ? p.c : -1 };
   if (world && finite(p.x, -1, world.W + 1) && finite(p.z, -1, world.D + 1)) {
     out.x = p.x;
     out.z = p.z;
@@ -71,7 +86,7 @@ export function readPresence(p, world) {
   return out;
 }
 
-export function createSession({ room, createMatch, createHost, t, introSeconds = 2.5, unlocked = () => 1, glasses = () => 0, firstPick = 1 }) {
+export function createSession({ room, createMatch, createHost, t, introSeconds = 2.5, unlocked = () => 1, look = () => ({ g: 0, h: 0, f: 0, t: 0 }), firstPick = 1 }) {
   const host = createHost(room);
   const s = {
     room,
@@ -86,7 +101,8 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
     now: 0,
     nightT: 0,
     roundId: '',
-    me: { id: room.me.id, x: 0, z: 0, a: 0, vx: 0, vz: 0, noiseT: 0, st: 'lobby', stun: 0, held: false, holdT: 0, charge: 0, smallReady: 0, bigReady: 0, dropAt: -9, pend: 0, joined: false, body: null, rumble: 0, tailGone: false },
+    me: { id: room.me.id, x: 0, z: 0, a: 0, vx: 0, vz: 0, noiseT: 0, st: 'lobby', stun: 0, held: false, holdT: 0, charge: 0, smallReady: 0, bigReady: 0, dropAt: -9, pend: 0, joined: false, body: null, rumble: 0, tailGone: false, chain: 0, chainT: -99, squeaks: 0, tiptoe: 0 },
+    cr: [],
     seat: -1,
     focus: null,
     paused: false,
@@ -104,6 +120,8 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
   let hostT = 0;
   let huntSent = -9;
   let hostRng = createRng(1);
+  const strikes = new Map(); // the host's recent knife and paw strikes, for close-shave claims
+  const shaved = new Set();
   const awaySince = new Map();
   const lastSeen = new Map();
 
@@ -115,7 +133,7 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
     resultsSeconds: 0,
     startRound(m) {
       const n = s.pick();
-      const world = worldFor(n);
+      const world = worldFor(n, s.pickDay());
       const ids = m.seats.map((x) => x.id);
       const tNow = now();
       const d = createNight(world, ids, tNow);
@@ -123,6 +141,8 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
       hostT = tNow;
       huntSent = -9;
       hostRng = createRng(hashSeed(`${room.match.id}:${n}`));
+      strikes.clear();
+      shaved.clear();
       return d;
     },
     onTick(m) {
@@ -156,7 +176,7 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
     if (raw === lastRaw) return lastData ? structuredClone(lastData) : null;
     const lv = raw && typeof raw === 'object' ? raw.lv : 0;
     if (!finite(lv, 1, NIGHT_COUNT)) return null;
-    const d = validNight(raw, worldFor(lv));
+    const d = validNight(raw, worldFor(lv, raw.dy));
     lastRaw = raw;
     lastData = d;
     return d ? structuredClone(d) : null;
@@ -167,7 +187,7 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
     if (!match.isHost || match.phase !== 'round') return false;
     const d = readData(match.data);
     if (!d) return false;
-    const world = worldFor(d.lv);
+    const world = worldFor(d.lv, d.dy);
     // A wheel on the move is where its lead says.
     d.it.forEach((it) => {
       if (it.k !== 'W' || !it.by) return;
@@ -235,17 +255,56 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
       }),
   });
 
+  const rpcCrumb = host.rpc('crumb', {
+    args: { i: t.int(0, 63), ...pos },
+    rate: 16,
+    validate: (from, a) => (playing(from.id) && near(from.id, a.x, a.z, 2)) || 'not now',
+    run: (from, a) => edit((d, w, tNow) => takeCrumb(d, w, a.i, from.id, a.x, a.z, tNow) === ''),
+  });
+  const rpcShave = host.rpc('shave', {
+    args: { k: t.int(0, 2), q: t.int(0, 100000) },
+    rate: 4,
+    validate: (from, a) => {
+      if (!playing(from.id)) return 'not now';
+      const key = `${KINDS[a.k]}:${a.q}`;
+      const st = strikes.get(key);
+      if (!st || now() - st.at > 2.5 || shaved.has(`${from.id}|${key}`)) return 'no';
+      const p = posOf(from.id);
+      return (p && p.x !== undefined && Math.hypot(p.x - st.x, p.z - st.z) < 2.4) || 'too far';
+    },
+    run: (from, a) => {
+      shaved.add(`${from.id}|${KINDS[a.k]}:${a.q}`);
+      return edit((d) => noteShave(d, from.id));
+    },
+  });
+  // A mouse made a floor noise: no Quiet feet tonight (written once per mouse).
+  function hostNoise(id) {
+    if (!match.isHost || !s.data || s.data.mice[id]?.nz) return;
+    edit((d) => noteNoise(d, id));
+  }
+
   // ------------------------------------------------------------ the lobby's pick
   s.pick = () => {
     const v = pickState.get();
     const n = v && Number.isInteger(v.n) ? v.n : 1;
     return Math.max(1, Math.min(NIGHT_COUNT, n));
   };
-  s.setPick = (n) => {
+  // The Daily Raid's day when that's the pick, else 0.
+  s.pickDay = () => {
+    const v = pickState.get();
+    const dy = v && validDay(v.dy) ? v.dy : 0;
+    return dy && dailyNight(dy)?.id === s.pick() ? dy : 0;
+  };
+  s.setPick = (n, dy = 0) => {
     if (!room.isHost || room.match.phase !== 'lobby') return false;
-    const want = Math.max(1, Math.min(unlocked(), NIGHT_COUNT, Math.floor(n) || 1));
-    if (want === s.pick()) return true;
-    pickState.set({ n: want });
+    let want = Math.max(1, Math.min(unlocked(), NIGHT_COUNT, Math.floor(n) || 1));
+    let day = 0;
+    if (validDay(dy) && dailyNight(dy)) {
+      day = dy;
+      want = dailyNight(dy).id;
+    }
+    if (want === s.pick() && day === s.pickDay()) return true;
+    pickState.set(day ? { n: want, dy: day } : { n: want });
     room.clearReady?.();
     return true;
   };
@@ -260,11 +319,19 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
     room.startMatch({ countdown: 0 });
     return true;
   };
+  // Alone at the title: straight into today's Daily Raid.
+  s.quickRaid = (day) => {
+    if (room.match.phase !== 'lobby' || !room.isHost || room.online.length > 1 || !dailyNight(day)) return false;
+    pickState.set({ n: dailyNight(day).id, dy: day });
+    room.startMatch({ countdown: 0 });
+    return true;
+  };
   // Results: the host picks what's next. Alone it also starts at once.
-  s.next = (n) => {
+  s.next = (n, dy = 0) => {
     if (!room.isHost) return;
     const want = Math.max(1, Math.min(NIGHT_COUNT, n));
-    pickState.set({ n: Math.min(want, Math.max(unlocked(), 1)) });
+    if (validDay(dy) && dailyNight(dy)) pickState.set({ n: dailyNight(dy).id, dy });
+    else pickState.set({ n: Math.min(want, Math.max(unlocked(), 1)) });
     s.autoStart = room.online.length <= 1;
     room.endMatch();
   };
@@ -308,6 +375,7 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
     addRing(kind, msg.x, msg.z, tt, from.id, seat);
     if (msg.k === 's') fx('squeak', { big: !!msg.b, seat, x: msg.x, z: msg.z, mine: false });
     else fx('noise', { kind, x: msg.x, z: msg.z, mine: false });
+    if (FLOOR_NOISES.includes(kind)) hostNoise(from.id);
   });
 
   function seatOf(id) {
@@ -333,6 +401,7 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
   let purrAt = new Map();
   let wasParticipant = false;
   let wasPhase = '';
+  const crumbPend = new Map(); // crumbs this page asked for: index -> until when it hides them
 
   function beginRound(world, d) {
     s.world = world;
@@ -350,6 +419,10 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
     s.me.charge = 0;
     s.me.tailGone = false;
     s.me.dropAt = -9;
+    s.me.chain = 0;
+    s.me.chainT = -99;
+    s.me.squeaks = 0;
+    crumbPend.clear();
     placeAtHole(world);
     // Back from a reload: keep the spot this page last said it was at.
     const p = readPresence(room.me?.presence, world);
@@ -390,8 +463,19 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
       d.tr.forEach((v, i) => {
         if (v && !before.tr[i]) fx('snap', { i, mine: false });
       });
+      d.cr.forEach((v, i) => {
+        if (v && !before.cr[i] && !crumbPend.has(i)) {
+          const c = s.world.crumbs[i];
+          if (c) fx('crumb', { i, x: c[0], z: c[1], mine: false });
+        }
+      });
     }
     s.data = d;
+    // What the screen hides: crumbs gone in the record, and the ones this page just took.
+    if (d) {
+      if (s.cr.length !== d.cr.length) s.cr = new Array(d.cr.length).fill(0);
+      for (let i = 0; i < d.cr.length; i++) s.cr[i] = d.cr[i] || (crumbPend.get(i) ?? -1) > s.now ? 1 : 0;
+    } else if (s.cr.length) s.cr = [];
   }
 
   // ------------------------------------------------------------ the frame
@@ -402,7 +486,7 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
     s.paused = match.paused;
     s.now = now();
     if (phase === 'lobby') {
-      s.world = worldFor(s.pick());
+      s.world = worldFor(s.pick(), s.pickDay());
       s.data = null;
       s.roundId = '';
       s.me.st = 'lobby';
@@ -419,18 +503,18 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
       const rid = match.roundId;
       if (d && rid && rid !== s.roundId) {
         s.roundId = rid;
-        beginRound(worldFor(d.lv), d);
+        beginRound(worldFor(d.lv, d.dy), d);
         wasParticipant = room.isParticipant(s.me.id);
       } else if (!d && phase === 'intro' && rid !== s.roundId && wasPhase !== 'intro') {
         // The intro: the night is picked but not begun. Show its room and strike midnight.
-        s.world = worldFor(s.pick());
+        s.world = worldFor(s.pick(), s.pickDay());
         s.rings = [];
         placeAtHole(s.world);
         const [hx, hz] = holeMouth(s.world);
         addRing('midnight', hx, hz, s.now);
         fx('midnight', { night: s.world.night.id });
       }
-      if (d) s.world = worldFor(d.lv);
+      if (d) s.world = worldFor(d.lv, d.dy);
     }
     // Admitted while watching: out of the hole with a tail.
     const part = room.isParticipant(s.me.id);
@@ -571,6 +655,21 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
       if (kind) noise(kind, me.x, me.z);
       if (it) tryHome(ci, me.x, me.z);
     }
+    // Tiptoeing: moving, but slow enough to be silent.
+    const sp = Math.hypot(me.vx, me.vz);
+    me.tiptoe = sp > 0.2 && sp <= MOUSE.quiet && Math.hypot(ix, iz) > 0.05 ? Math.min(1, me.tiptoe + dt * 6) : Math.max(0, me.tiptoe - dt * 6);
+    // Crumbs underfoot.
+    for (let i = 0; i < world.crumbs.length; i++) {
+      if (d.cr[i] || crumbPend.has(i)) continue;
+      const c = world.crumbs[i];
+      if ((c[0] - me.x) ** 2 + (c[1] - me.z) ** 2 > CRUMB.reach * CRUMB.reach) continue;
+      crumbPend.set(i, tNow + 1.5);
+      me.chain = tNow - me.chainT <= CRUMB.gap ? me.chain + 1 : 1;
+      me.chainT = tNow;
+      const mult = chainMult(me.chain);
+      rpcCrumb({ i, x: r2(me.x), z: r2(me.z) });
+      fx('crumb', { i, x: c[0], z: c[1], mine: true, chain: me.chain, mult, pts: CRUMB.pts * mult });
+    }
     me.st = inHole(world, me.x, me.z) ? 'hole' : 'play';
     // Traps: a snap and a bonk.
     world.traps.forEach((tr, i) => {
@@ -616,6 +715,7 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
   function squeak(big) {
     const me = s.me;
     const tNow = s.now;
+    me.squeaks += 1;
     if (big) me.bigReady = tNow + MOUSE.bigCool;
     me.smallReady = tNow + MOUSE.smallCool;
     addRing(big ? 'big' : 'small', me.x, me.z, tNow, me.id, s.seat);
@@ -627,6 +727,7 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
     addRing(kind, x, z, s.now, s.me.id, s.seat);
     room.send({ k: 'n', x: r2(x), z: r2(z), n: kind });
     fx('noise', { kind, x, z, mine: true });
+    if (FLOOR_NOISES.includes(kind)) hostNoise(s.me.id);
   }
 
   // This page judges its own mouse: hit only if the strike lands where it is.
@@ -658,7 +759,13 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
       fx('chop', { k: h.k, x: ch.x, z: ch.z });
       if (s.me.st !== 'play' || !room.isParticipant(s.me.id)) continue;
       if (strikeHits(s.world, h, ch, s.me.x, s.me.z)) ouch(s.now, h.k);
-      else if (Math.hypot(s.me.x - ch.x, s.me.z - ch.z) < 1.4) fx('closeShave', { k: h.k });
+      else if (Math.hypot(s.me.x - ch.x, s.me.z - ch.z) < 1.4) {
+        const rec = s.data?.mice[s.me.id];
+        if (rec && s.now >= rec.safe) {
+          fx('closeShave', { k: h.k, x: ch.x, z: ch.z });
+          rpcShave({ k: Math.max(0, KINDS.indexOf(h.k)), q: ch.seq });
+        }
+      }
     }
   }
 
@@ -706,7 +813,14 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
     while (hostT + HUNT_STEP <= tNow && steps++ < 12) {
       const prev = hostT;
       hostT += HUNT_STEP;
-      tickHunters(H, { world, mice, rings: s.rings, prev, solo: !!d.solo, entered: !!d.g, rng: hostRng }, hostT, HUNT_STEP);
+      const evs = tickHunters(H, { world, mice, rings: s.rings, prev, solo: !!d.solo, entered: !!d.g, rng: hostRng }, hostT, HUNT_STEP);
+      for (const e of evs) {
+        if (e.type === 'spot' && e.id) edit((dd) => noteSpot(dd, e.id));
+        else if (e.type === 'chop' || e.type === 'pounce') {
+          strikes.set(`${e.k}:${e.seq}`, { x: e.x, z: e.z, at: tNow });
+          if (strikes.size > 12) strikes.delete(strikes.keys().next().value);
+        }
+      }
     }
     if (tNow - hostT > 0.5) hostT = tNow;
     if (tNow - huntSent >= HUNT_EVERY) {
@@ -800,7 +914,8 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
       s.mice = ids.map((id, seat) => {
         const [x, z, a] = spawnPoint(s.world, seat);
         const p = room.players.get(id);
-        return { id, seat, name: p?.name ?? '', me: id === s.me.id, x, z, a, speed: 0, st: 'hole', tail: 1, g: id === s.me.id ? glasses() : readPresence(p?.presence, null)?.g ?? 0, carry: '', lead: false, away: false, stun: 0, charge: 0, out: 0, ready: !!p?.ready || id === room.host };
+        const lk = id === s.me.id ? cleanLook(look()) : readPresence(p?.presence, null)?.lk ?? cleanLook(null);
+        return { id, seat, name: p?.name ?? '', me: id === s.me.id, x, z, a, speed: 0, st: 'hole', tail: 1, g: lk.g, look: lk, carry: '', lead: false, away: false, stun: 0, charge: 0, out: 0, ready: !!p?.ready || id === room.host };
       });
       s.focus = s.mice[0] ?? null;
       return;
@@ -836,7 +951,11 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
         speed: Math.hypot(vx, vz),
         st,
         tail: rec ? rec.tail : 1,
-        g: mine ? glasses() : readPresence(p?.presence, null)?.g ?? 0,
+        ...(() => {
+          const lk = mine ? cleanLook(look()) : readPresence(p?.presence, null)?.lk ?? cleanLook(null);
+          return { g: lk.g, look: lk };
+        })(),
+        tiptoe: mine ? s.me.tiptoe : 0,
         carry: ci >= 0 ? d.it[ci].k : '',
         lead: ci >= 0 && d.it[ci].by === id,
         away: p?.connected === false,
@@ -882,7 +1001,8 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
 
   function publish() {
     const me = s.me;
-    const p = { st: me.st, g: glasses() };
+    const lk = cleanLook(look());
+    const p = { st: me.st, g: lk.g, lk: [lk.g, lk.h, lk.f, lk.t] };
     if (s.data && room.isParticipant(me.id)) {
       Object.assign(p, { x: r2(me.x), z: r2(me.z), a: r2(me.a), vx: r2(me.vx), vz: r2(me.vz), tl: me.tailGone ? 0 : 1, c: carrying(s.data, me.id) });
       if (me.in) p.in = me.in;
@@ -897,14 +1017,21 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
     if (!d) return null;
     const mice = Object.values(d.mice);
     const home = d.it.filter((i) => i.home).length;
+    const time = Math.max(0, (d.endAt || s.now) - d.t0);
+    const world = worldFor(d.lv, d.dy);
+    const me = d.mice[s.me.id];
     return {
       night: d.lv,
+      day: d.dy,
       end: d.end,
-      time: Math.max(0, (d.endAt || s.now) - d.t0),
+      time,
       home,
       total: d.it.length,
+      score: scoreNight(d, world, time),
+      mine: me ? { crumbs: me.cr, chain: me.bc, shaves: me.cs, spotted: me.sp, tail: me.tail, squeaks: s.me.squeaks, home: me.home, wheel: d.it.some((i) => i.k === 'W' && i.home) } : null,
+      solo: Object.keys(d.mice).length <= 1,
       stars: { home: home > 0, all: home === d.it.length && d.it.length > 0, tails: home > 0 && mice.length > 0 && mice.every((m) => m.tail === 1) },
-      rows: Object.entries(d.mice).map(([id, m]) => ({ id, name: room.players.get(id)?.name ?? match.seats.find((x) => x.id === id)?.name ?? 'Mouse', seat: seatOf(id), home: m.home, tail: m.tail, me: id === s.me.id })),
+      rows: Object.entries(d.mice).map(([id, m]) => ({ id, name: room.players.get(id)?.name ?? match.seats.find((x) => x.id === id)?.name ?? 'Mouse', seat: seatOf(id), home: m.home, tail: m.tail, crumbs: m.cr, pts: m.pt, me: id === s.me.id, look: id === s.me.id ? cleanLook(look()) : readPresence(room.players.get(id)?.presence, null)?.lk ?? cleanLook(null) })),
     };
   };
 
@@ -918,6 +1045,12 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
 // ------------------------------------------------------------ the same picture from a headless sim (title, autoplay, posters)
 
 const simRings = new WeakMap();
+// The attract mode's three mice, dressed.
+const SIM_LOOKS = [
+  { g: 0, h: 0, f: 0, t: 0 },
+  { g: 2, h: 1, f: 1, t: 1 },
+  { g: 4, h: 3, f: 2, t: 2 },
+];
 
 export function viewFromSim(sim, { names = [] } = {}) {
   const { data, world } = sim;
@@ -934,7 +1067,9 @@ export function viewFromSim(sim, { names = [] } = {}) {
       speed: Math.hypot(m.vx, m.vz),
       st: m.st,
       tail: data.mice[m.id]?.tail ?? 1,
-      g: [0, 2, 4][n % 3],
+      g: SIM_LOOKS[n % 3].g,
+      look: SIM_LOOKS[n % 3],
+      tiptoe: Math.hypot(m.vx, m.vz) > 0.2 && Math.hypot(m.vx, m.vz) <= MOUSE.quiet ? 1 : 0,
       carry: ci >= 0 ? data.it[ci].k : '',
       lead: ci >= 0 && data.it[ci].by === m.id,
       away: false,
@@ -965,5 +1100,5 @@ export function viewFromSim(sim, { names = [] } = {}) {
     }
     return made;
   });
-  return { world, data, mice, items, rings, hunters: sim.hunters, now: sim.now, nightT: sim.now, focus: mice[0] };
+  return { world, data, cr: data.cr, mice, items, rings, hunters: sim.hunters, now: sim.now, nightT: sim.now, focus: mice[0] };
 }

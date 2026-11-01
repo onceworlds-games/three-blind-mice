@@ -203,3 +203,54 @@ test('garbage from a page is ignored', async () => {
     T.close();
   }
 });
+
+test('crumbs: one mouth per crumb, gone on both pages, counted in the shared record', async () => {
+  const T = table();
+  try {
+    const a = T.add('a');
+    const b = T.add('b');
+    await T.frames(3);
+    a.setPick(2);
+    b.ready(true);
+    await T.frames(2);
+    a.start();
+    assert.ok(await T.until(() => a.phase === 'round' && b.data && a.data));
+    // Walk up to it (the host checks the page's last said position is near).
+    const [cx, cz] = b.world.crumbs[0];
+    const dir = b.world.crumbs[1][0] > cx ? -1 : 1;
+    b.me.x = cx + dir * 0.9;
+    b.me.z = cz;
+    b.me.st = 'play';
+    await T.frames(4);
+    b.me.x = cx;
+    assert.ok(await T.until(() => a.data?.cr[0] === 1 && b.data?.cr[0] === 1), 'the crumb is gone for everyone');
+    assert.equal(a.data.mice.b.cr, 1);
+    assert.equal(a.data.mice.b.pt, 10);
+    assert.equal(a.result().score.lines.find((l) => l.id === 'crumbs').n, 1);
+  } finally {
+    T.close();
+  }
+});
+
+test('the Daily Raid: the host picks today and every page plays the same remix', async () => {
+  const T = table();
+  try {
+    const a = T.add('a');
+    const b = T.add('b');
+    await T.frames(3);
+    const day = 20261101;
+    assert.equal(a.setPick(0, day), true);
+    await T.frames(2);
+    assert.equal(b.pickDay(), day);
+    b.ready(true);
+    await T.frames(2);
+    a.start();
+    assert.ok(await T.until(() => a.phase === 'round' && a.data && b.data));
+    assert.equal(b.data.dy, day);
+    assert.equal(b.world.night.daily, day);
+    assert.deepEqual(a.world.crumbs, b.world.crumbs);
+    assert.equal(a.result().day, day);
+  } finally {
+    T.close();
+  }
+});

@@ -2,16 +2,18 @@
 // here before), so it plays like a skilled player: quiet routes, waits in the dark while her light passes, dodges the knife,
 // drops the cheese to run, and lures her away. `skill` (0..1) sets its reaction time and care; `careless` ignores the danger.
 
-import { findPath, isCover, noiseAt, clearAt, navNode, nodeXZ } from './world.js';
+import { findPath, isCover, noiseAt, clearAt, clearSegment, navNode, nodeXZ, NOISE_RING } from './world.js';
 import { holeMouth, MOUSE } from './mouse.js';
 import { carrying } from './night.js';
 import { HUNTER, lanternOf, strikeOf } from './hunters.js';
 import { RINGS } from './rings.js';
 
-export function createBrain({ skill = 0.8, careless = false, role = '', rng }) {
+// rush: a speedrun (no crumbs, no tiptoe), for checking pars.
+export function createBrain({ skill = 0.8, careless = false, role = '', rng, rush = false }) {
   return {
     skill,
     careless,
+    rush,
     role,
     rng,
     path: null,
@@ -151,6 +153,12 @@ export function think(brain, ctx) {
   if (item) {
     [gx, gz] = holeMouth(world);
     key = 'home';
+    // A crumb right on the way home is worth the step.
+    const crumb = item.k === 'w' ? nearCrumb(brain, ctx, 1.1) : -1;
+    if (crumb >= 0) {
+      [gx, gz] = world.crumbs[crumb];
+      key = `crumb:${crumb}`;
+    }
     if (item.k === 'W') {
       mode = 'wheel';
       body = { x: item.x, z: item.z };
@@ -158,7 +166,11 @@ export function think(brain, ctx) {
     }
   } else {
     const pick = chooseItem(brain, ctx);
-    if (pick >= 0) {
+    const crumb = pick >= 0 || brain.careless ? nearCrumb(brain, ctx, 1.4 + brain.skill * 1.6) : -1;
+    if (crumb >= 0) {
+      [gx, gz] = world.crumbs[crumb];
+      key = `crumb:${crumb}`;
+    } else if (pick >= 0) {
       gx = data.it[pick].x;
       gz = data.it[pick].z;
       key = `item:${pick}`;
@@ -196,6 +208,18 @@ export function think(brain, ctx) {
   out.ix = ix;
   out.iz = iz;
 
+  // Tiptoe over noisy floor when someone who'd hear it is near.
+  if (!brain.careless && !brain.rush && brain.skill >= 0.5 && !(item && item.k === 'W')) {
+    const kind = noiseAt(world, me.x, me.z) ?? (next ? noiseAt(world, next[0], next[1]) : null);
+    if (kind) {
+      const r = (NOISE_RING[kind] ?? 3) + 2.5;
+      if (hunters.some((h) => h.m !== 'wait' && h.m !== 'sleep' && Math.hypot(h.x - me.x, h.z - me.z) < r + (h.k === 'cat' ? 1 : 3))) {
+        out.ix *= 0.45;
+        out.iz *= 0.45;
+      }
+    }
+  }
+
   // 5. Squeak now and then, when nobody who'd mind is in reach.
   if (now >= brain.nextSqueak && !item) {
     const near = (r) => hunters.some((h) => h.m !== 'wait' && Math.hypot(h.x - me.x, h.z - me.z) < r);
@@ -208,6 +232,27 @@ export function think(brain, ctx) {
     } else brain.nextSqueak = now + 1;
   }
   return out;
+}
+
+// The nearest crumb still there within reach, in the dark and with nothing in the way; -1 when none.
+function nearCrumb(brain, ctx, reach) {
+  const { world, data, me, hunters } = ctx;
+  if (brain.rush || !world.crumbs?.length || !data.cr) return -1;
+  // Not with someone after us.
+  if (!brain.careless && hunters.some((h) => h.tgt === me.id && h.m !== 'patrol' && h.m !== 'wait')) return -1;
+  let best = -1;
+  let bestD = reach;
+  for (let i = 0; i < world.crumbs.length; i++) {
+    if (data.cr[i]) continue;
+    const [x, z] = world.crumbs[i];
+    const d = Math.hypot(x - me.x, z - me.z);
+    if (d >= bestD) continue;
+    if (!brain.careless && (lit(world, hunters, x, z, 0.4) || hunters.some((h) => h.m !== 'wait' && h.m !== 'sleep' && Math.hypot(h.x - x, h.z - z) < (h.k === 'cat' ? 2.5 : 3.5)))) continue;
+    if (!clearSegment(world, me.x, me.z, x, z, 0.2, 'mouse')) continue;
+    best = i;
+    bestD = d;
+  }
+  return best;
 }
 
 function chooseItem(brain, ctx) {

@@ -20,8 +20,8 @@ import { createRng } from './core/rng.js';
 import { holeMouth } from './core/mouse.js';
 import { RINGS, ringReachTime } from './core/rings.js';
 import { SEAT_CSS } from './render/echo.js';
-import { GLASSES } from './looks.js';
-import { cleanProgress, loadProgress, mergeProgress, saveProgress, totalStars, unlockedNights, recordNight } from './progress.js';
+import { GLASSES, unlockedAt } from './looks.js';
+import { cleanProgress, loadProgress, mergeProgress, saveProgress, totalStars, unlockedNights, recordNight, levelOf } from './progress.js';
 import { createHints } from './hints.js';
 
 const ow = window.onceworlds ?? null;
@@ -102,7 +102,7 @@ async function boot() {
   let wantQuick = 0;
   function makeSession() {
     session?.dispose();
-    session = createSession({ room, createMatch, createHost, t, unlocked: () => Math.max(unlockedNights(progress), ENV_NIGHT), glasses: () => progress.glasses, firstPick: ENV_NIGHT || 1 });
+    session = createSession({ room, createMatch, createHost, t, unlocked: () => Math.max(unlockedNights(progress), ENV_NIGHT), look: () => progress.look, firstPick: ENV_NIGHT || 1 });
     session.match.on('results', () => onResults());
     room.on('close', (reason) => onClosed(reason));
   }
@@ -139,10 +139,10 @@ async function boot() {
   safe(() => ow?.on?.('reserved', (a) => ui.layout(a)));
 
   function cycleGlasses() {
-    const stars = totalStars(progress);
-    const owned = GLASSES.map((g, i) => (stars >= i * 6 ? i : -1)).filter((i) => i >= 0);
-    const at = owned.indexOf(progress.glasses);
-    progress.glasses = owned[(at + 1) % owned.length] ?? 0;
+    const level = levelOf(progress.xp).level;
+    const owned = GLASSES.map((g, i) => (unlockedAt('glasses', i, level) ? i : -1)).filter((i) => i >= 0);
+    const at = owned.indexOf(progress.look.g);
+    progress.look.g = owned[(at + 1) % owned.length] ?? 0;
     persist();
     audio.play('click');
   }
@@ -760,7 +760,7 @@ async function boot() {
         ready: !!room.me?.ready,
         hostName: room.players.get(room.host)?.name ?? 'the host',
         inviteable: !!ow?.ui?.showInvite && room.kind === 'private',
-        seats: players.map((p) => ({ id: p.id, name: p.name, me: p.id === room.me.id, host: p.id === room.host, ready: !!p.ready, g: p.id === room.me.id ? progress.glasses : (p.presence?.g ?? 0), avatar: avatars.get(p.id) ?? null })),
+        seats: players.map((p) => ({ id: p.id, name: p.name, me: p.id === room.me.id, host: p.id === room.host, ready: !!p.ready, g: p.id === room.me.id ? progress.look.g : (p.presence?.g ?? 0), avatar: avatars.get(p.id) ?? null })),
       });
       players.forEach((p) => fetchAvatar(p.id));
       setControls(null);
@@ -821,7 +821,7 @@ async function boot() {
           }, 500 + i * 450),
         );
       }
-      if (r) vm = { ...s, burrow: { wedges: s.data.it.filter((i) => i.home && i.k === 'w').length, wheel: s.data.it.some((i) => i.home && i.k === 'W'), mice: r.rows.map((row) => ({ seat: row.seat, tail: row.tail, g: row.me ? progress.glasses : 0 })) } };
+      if (r) vm = { ...s, burrow: { wedges: s.data.it.filter((i) => i.home && i.k === 'w').length, wheel: s.data.it.some((i) => i.home && i.k === 'W'), mice: r.rows.map((row) => ({ seat: row.seat, tail: row.tail, g: row.look?.g ?? 0, look: row.look })) } };
       setControls(null);
     }
     if (phase !== 'results' && view.mode === 'burrow') view.mode = 'follow';

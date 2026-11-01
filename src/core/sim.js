@@ -4,14 +4,16 @@
 import { buildWorld } from './world.js';
 import { createRng } from './rng.js';
 import { createMouse, stepMouse, stepNoise, inHole, speedFor, wheelPush, wheelSlot, MOUSE, holeMouth, spawnPoint } from './mouse.js';
-import { createNight, grab, drop, home, hit, snap, carrying, endCheck, restCheck, stars } from './night.js';
+import { createNight, grab, drop, home, hit, snap, carrying, endCheck, restCheck, stars, takeCrumb, noteSpot, noteShave, noteNoise } from './night.js';
+import { CRUMB } from './crumbs.js';
+import { scoreNight } from './score.js';
 import { createHunters, tickHunters, strikeHits } from './hunters.js';
 import { RINGS, masked, maskingBetween } from './rings.js';
 import { createBrain, think } from './autopilot.js';
 
 export const STEP = 1 / 30;
 
-export function createSim({ night, ids = ['m1'], seed = 1, skill = 0.8, careless = false, brains = true, solo } = {}) {
+export function createSim({ night, ids = ['m1'], seed = 1, skill = 0.8, careless = false, brains = true, solo, rush = false } = {}) {
   const world = buildWorld(night);
   const rng = createRng(seed);
   const data = createNight(world, ids, 0);
@@ -24,7 +26,7 @@ export function createSim({ night, ids = ['m1'], seed = 1, skill = 0.8, careless
     seat: n,
     squeaks: 0,
     tail: 1,
-    brain: brains ? createBrain({ skill: Array.isArray(skill) ? skill[n] ?? 0.8 : skill, careless: Array.isArray(careless) ? !!careless[n] : careless, rng: createRng(seed * 977 + n * 31 + 7) }) : null,
+    brain: brains ? createBrain({ skill: Array.isArray(skill) ? skill[n] ?? 0.8 : skill, careless: Array.isArray(careless) ? !!careless[n] : careless, rng: createRng(seed * 977 + n * 31 + 7), rush }) : null,
     input: { ix: 0, iz: 0, squeak: null, drop: false },
     wheelT: 0,
     closeShave: 0,
@@ -42,7 +44,10 @@ export function createSim({ night, ids = ['m1'], seed = 1, skill = 0.8, careless
     for (const m of mice) {
       if (m.st !== 'play') continue;
       if (!strikeHits(world, h, ch, m.x, m.z)) {
-        if (Math.hypot(m.x - ch.x, m.z - ch.z) < 1.4) m.closeShave += 1;
+        if (Math.hypot(m.x - ch.x, m.z - ch.z) < 1.4) {
+          m.closeShave += 1;
+          noteShave(data, m.id);
+        }
         continue;
       }
       const what = hit(data, world, m.id, sim.now, m.x, m.z);
@@ -143,7 +148,10 @@ export function createSim({ night, ids = ['m1'], seed = 1, skill = 0.8, careless
     const evs = tickHunters(hunters, { world, mice: mice.map((m) => ({ id: m.id, x: m.x, z: m.z, vx: m.vx, vz: m.vz, hidden: m.st !== 'play' })), rings: sim.rings, prev, solo: !!data.solo, entered: !!data.g, rng }, now, dt);
     for (const e of evs) {
       sim.events.push(e);
-      if (e.type === 'spot') sim.stats.spotted += 1;
+      if (e.type === 'spot') {
+        sim.stats.spotted += 1;
+        noteSpot(data, e.id);
+      }
       if (e.type === 'hear') sim.stats.heard += 1;
       if (e.type === 'chop' || e.type === 'pounce') {
         const h = hunters.find((hh) => hh.k === e.k);
@@ -167,7 +175,19 @@ export function createSim({ night, ids = ['m1'], seed = 1, skill = 0.8, careless
 
   function afterMove(m, it, ci, dt, inp) {
     const noise = stepNoise(world, m, dt);
-    if (noise) sim.ring(noise, m.x, m.z, m.id);
+    if (noise) {
+      sim.ring(noise, m.x, m.z, m.id);
+      noteNoise(data, m.id);
+    }
+    // Crumbs underfoot.
+    if (m.st !== 'out') {
+      for (let i = 0; i < world.crumbs.length; i++) {
+        if (data.cr[i]) continue;
+        const c = world.crumbs[i];
+        if ((c[0] - m.x) ** 2 + (c[1] - m.z) ** 2 > CRUMB.reach * CRUMB.reach) continue;
+        if (takeCrumb(data, world, i, m.id, m.x, m.z, sim.now) === '') sim.events.push({ type: 'crumb', id: m.id, i, ch: data.mice[m.id].ch });
+      }
+    }
     if (inp.squeak && m.st !== 'out') {
       sim.ring(inp.squeak, m.x, m.z, m.id);
       m.squeaks += 1;
@@ -216,5 +236,6 @@ export function createSim({ night, ids = ['m1'], seed = 1, skill = 0.8, careless
   };
 
   sim.stars = () => stars(data);
+  sim.score = () => scoreNight(data, world, (data.endAt || sim.now) - data.t0);
   return sim;
 }
