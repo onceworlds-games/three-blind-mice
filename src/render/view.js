@@ -600,9 +600,21 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
   let emberT = 0;
   let memT = 0;
 
+  // While new shaders compile, the screen is cleared rather than left undrawn (a canvas that goes frames without a draw
+  // can stall a capture's virtual clock); it lasts a moment, under the screen that covers the change.
+  function holdFrame() {
+    renderer.setRenderTarget(null);
+    renderer.clear();
+  }
+
   v.render = (vm, dtIn) => {
     const wall = performance.now();
-    if (wall < v.holdUntil) return; // hit-stop: the last frame stays on screen
+    // Hit-stop: nothing moves (the models keep their last pose), but the frame is still drawn, so the page never goes a
+    // frame without one (a canvas left undrawn can stall a capture's virtual clock).
+    if (wall < v.holdUntil) {
+      if (!compiling) v.post.render(0, v.time);
+      return;
+    }
     let dt = dtIn;
     if (wall < v.slowUntil) {
       const u = (wall - v.slowFrom) / Math.max(1, v.slowUntil - v.slowFrom);
@@ -612,7 +624,7 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
     if (v.mode === 'burrow') {
       burrow.update(vm, dt, v.reduced);
       if (!warmed.has(burrow.scene)) warm(burrow.scene, burrow.camera);
-      if (compiling && performance.now() < compileUntil) return;
+      if (compiling && performance.now() < compileUntil) return holdFrame();
       echo.uRimScale.value = 0.25;
       echo.uCut.value.set(0, 0, 0, 0);
       v.post.setScene(burrow.scene, burrow.camera);
@@ -835,7 +847,7 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
     for (const s of moons) if (s.userData.base) s.intensity = s.userData.base * (v.reduced ? 1 : 0.96 + Math.sin(t * 0.3) * 0.04);
     fx.update(dt);
     placeCamera(dt, vm);
-    if (compiling && performance.now() < compileUntil) return;
+    if (compiling && performance.now() < compileUntil) return holdFrame();
     v.post.render(dt, v.time);
   };
 
