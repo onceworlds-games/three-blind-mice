@@ -2,7 +2,8 @@
 // the cheese they brought home. The results screen and the win poster.
 
 import * as THREE from 'three';
-import { createMouseModel, poseMouse, createWedge, createWheel } from './actors.js';
+import { createMouseModel, poseMouse, addMouse } from './mouse.js';
+import { createWedge, createWheel } from './items.js';
 
 const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...o });
 
@@ -124,8 +125,7 @@ export function createBurrow() {
   const mice = [0, 1, 2].map((seat) => {
     const m = createMouseModel(seat);
     m.root.scale.setScalar(1.8);
-    m.halo.visible = false;
-    scene.add(m.root);
+    addMouse(scene, m);
     return m;
   });
   // Where each mouse sits and which way it looks (pi / 2 faces the camera).
@@ -134,7 +134,7 @@ export function createBurrow() {
     [1.45, 0.0, 0.95, 1.0],
     [-1.5, 0.0, 0.95, 2.2],
   ];
-  const pose = { x: 0, z: 0, a: 0, speed: 0, st: 'hole', tail: 1, g: 0, carry: '', stun: 0, charge: 0, me: false, away: false };
+  const pose = { x: 0, y: 0, z: 0, a: 0, speed: 0, st: 'hole', tail: 1, g: 0, carry: '', stun: 0, charge: 0, me: false, away: false };
   let t = 0;
 
   return {
@@ -148,18 +148,19 @@ export function createBurrow() {
       const top = b.wedges > 2 || b.wheel ? 0.5 : 0.05;
       mice.forEach((m, i) => {
         const info = b.mice.find((x) => x.seat === i);
-        m.root.visible = !!info;
+        m.root.visible = m.tail.mesh.visible = !!info;
         if (!info) return;
         const [x, y, z, a] = seatsAt[i];
         pose.x = x;
         pose.z = z;
         pose.a = a;
+        pose.y = i === 0 ? top : y;
         pose.tail = info.tail;
         pose.g = info.g ?? 0;
+        pose.look = info.look ?? { g: info.g ?? 0, h: 0, f: 0, t: 0 };
         poseMouse(m, pose, t + i * 2, dt, reduced);
-        m.root.position.y = i === 0 ? top : y;
-        m.root.scale.setScalar(1.8);
-        m.root.rotation.y = -a;
+        m.halo.visible = false;
+        m.shadow.visible = pose.y === 0;
       });
       flame.scale.set(1, 2 + (reduced ? 0 : Math.sin(t * 17) * 0.25), 1);
       light.intensity = 40 + (reduced ? 0 : Math.sin(t * 13) * 3 + Math.sin(t * 7) * 2);

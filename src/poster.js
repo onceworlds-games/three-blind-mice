@@ -5,7 +5,11 @@ import * as THREE from 'three';
 import { createView } from './render/view.js';
 import { createSim } from './core/sim.js';
 import { viewFromSim } from './core/session.js';
-import { createMouseModel, poseMouse, createWedge, createWheel, createCat, poseCat, createHuman } from './render/actors.js';
+import { createMouseModel, poseMouse, addMouse } from './render/mouse.js';
+import { createWedge, createWheel } from './render/items.js';
+import { createCat, poseCat } from './render/cat.js';
+import { createHuman } from './render/humans.js';
+import { loadProps } from './render/assets.js';
 import { SEAT_CSS, seatSvg, echo } from './render/echo.js';
 import { starSvg } from './ui.js';
 
@@ -16,6 +20,7 @@ export async function runPoster(name) {
   try {
     document.body.classList.add('poster');
     addStyle();
+    await loadProps();
     if (name.startsWith('badge-')) badge(name.slice(6));
     else if (name === 'icon') icon();
     else if (name === 'win') win();
@@ -189,8 +194,8 @@ function studio() {
       const model = createMouseModel(seat);
       poseMouse(model, { x, z, a, speed: 0, st: 'play', tail: 1, g: 0, carry: '', stun: 0, charge: 0, me: false, away: false, ...extra }, 1.2 + seat, 1 / 30, true);
       model.halo.visible = false;
-      model.root.rotation.y = -a;
-      scene.add(model.root);
+      model.shadow.visible = false;
+      addMouse(scene, model);
       return model;
     },
     wedge(x, y, z, ry, size = 1) {

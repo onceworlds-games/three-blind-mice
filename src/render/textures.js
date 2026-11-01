@@ -321,3 +321,288 @@ export function doormatTexture() {
   g.globalAlpha = 1;
   return tex(c, false);
 }
+
+// ---------------------------------------------------------------- the rebuilt rooms
+
+// A window's view: deep night blue, a few stars, sometimes the moon.
+export function skyTexture(moon = true, seed = 3) {
+  const [c, g] = canvas(256, 256);
+  const rnd = seeded(seed);
+  const grad = g.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0, '#0a1440');
+  grad.addColorStop(0.7, '#1d3270');
+  grad.addColorStop(1, '#3a4f8a');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 60; i++) {
+    g.fillStyle = `rgba(255,255,255,${0.3 + rnd() * 0.7})`;
+    const s = rnd() < 0.15 ? 2 : 1;
+    g.fillRect(rnd() * 256, rnd() * 170, s, s);
+  }
+  if (moon) {
+    const mg = g.createRadialGradient(170, 80, 4, 170, 80, 70);
+    mg.addColorStop(0, 'rgba(220,230,255,0.9)');
+    mg.addColorStop(0.3, 'rgba(150,170,255,0.25)');
+    mg.addColorStop(1, 'rgba(120,140,255,0)');
+    g.fillStyle = mg;
+    g.fillRect(0, 0, 256, 256);
+    g.fillStyle = '#f4f2e8';
+    g.beginPath();
+    g.arc(170, 80, 22, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = 'rgba(180,180,200,0.35)';
+    for (const [x, y, r] of [[163, 74, 5], [178, 88, 4], [172, 70, 3]]) {
+      g.beginPath();
+      g.arc(x, y, r, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  // Rolling hills along the bottom.
+  g.fillStyle = '#060a1c';
+  g.beginPath();
+  g.moveTo(0, 256);
+  for (let x = 0; x <= 256; x += 16) g.lineTo(x, 212 + Math.sin(x * 0.03 + seed) * 12 + Math.sin(x * 0.011) * 10);
+  g.lineTo(256, 256);
+  g.fill();
+  return tex(c, false);
+}
+
+// The moonlight's cookie: four panes with soft edges, the cross bars dark.
+export function cookieTexture() {
+  const [c, g] = canvas(256, 256);
+  g.fillStyle = '#000';
+  g.fillRect(0, 0, 256, 256);
+  g.filter = 'blur(5px)';
+  g.fillStyle = '#fff';
+  const m = 42;
+  const bar = 12;
+  const w = (256 - m * 2 - bar) / 2;
+  for (const [x, y] of [[m, m], [m + w + bar, m], [m, m + w + bar], [m + w + bar, m + w + bar]]) g.fillRect(x, y, w, w);
+  g.filter = 'none';
+  const t = tex(c, false, false);
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
+// A shaft of light: bright at the top, fading down and to the sides.
+export function beamTexture() {
+  const [c, g] = canvas(64, 128);
+  const grad = g.createLinearGradient(0, 0, 0, 128);
+  grad.addColorStop(0, 'rgba(255,255,255,0.9)');
+  grad.addColorStop(1, 'rgba(255,255,255,0.0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 128);
+  g.globalCompositeOperation = 'destination-in';
+  const side = g.createLinearGradient(0, 0, 64, 0);
+  side.addColorStop(0, 'rgba(0,0,0,0)');
+  side.addColorStop(0.25, 'rgba(0,0,0,1)');
+  side.addColorStop(0.75, 'rgba(0,0,0,1)');
+  side.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = side;
+  g.fillRect(0, 0, 64, 128);
+  return tex(c, false, false);
+}
+
+// Creaky boards: a patch of loose, lighter boards with cracks and proud nails (overlaid on the floor; 1 tile per 2 u).
+export function creakTexture() {
+  const [c, g] = canvas(256, 256);
+  const rnd = seeded(41);
+  g.clearRect(0, 0, 256, 256);
+  for (let r = 0; r < 4; r++) {
+    const y = r * 64;
+    const tilt = (rnd() - 0.5) * 0.05;
+    g.save();
+    g.translate(128, y + 32);
+    g.rotate(tilt);
+    g.fillStyle = `hsl(${30 + rnd() * 8}, ${32 + rnd() * 10}%, ${50 + rnd() * 10}%)`;
+    g.globalAlpha = 0.55;
+    g.fillRect(-132, -29, 264, 58);
+    g.globalAlpha = 0.5;
+    g.strokeStyle = '#2a1408';
+    g.lineWidth = 2;
+    for (let k = 0; k < 3; k++) {
+      g.beginPath();
+      let x = -120 + rnd() * 60;
+      let yy = (rnd() - 0.5) * 30;
+      g.moveTo(x, yy);
+      for (let s = 0; s < 6; s++) {
+        x += 12 + rnd() * 20;
+        yy += (rnd() - 0.5) * 8;
+        g.lineTo(x, yy);
+      }
+      g.stroke();
+    }
+    g.globalAlpha = 0.9;
+    for (const nx of [-110, 110]) {
+      g.fillStyle = '#d8d0c0';
+      g.beginPath();
+      g.arc(nx, -14, 4, 0, Math.PI * 2);
+      g.arc(nx, 14, 4, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.restore();
+    g.globalAlpha = 0.7;
+    g.fillStyle = '#120804';
+    g.fillRect(0, y, 256, 3);
+  }
+  g.globalAlpha = 1;
+  return tex(c, true, true);
+}
+
+// Spilt grain: oats and dried peas on the floor (a crunchy, noisy patch).
+export function grainTexture() {
+  const [c, g] = canvas(256, 256);
+  const rnd = seeded(23);
+  g.clearRect(0, 0, 256, 256);
+  for (let i = 0; i < 520; i++) {
+    const x = rnd() * 256;
+    const y = rnd() * 256;
+    const a = rnd() * Math.PI;
+    g.save();
+    g.translate(x, y);
+    g.rotate(a);
+    if (rnd() < 0.3) {
+      g.fillStyle = `hsl(${80 + rnd() * 20}, 40%, ${45 + rnd() * 15}%)`;
+      g.beginPath();
+      g.arc(0, 0, 3.5, 0, Math.PI * 2);
+      g.fill();
+    } else {
+      g.fillStyle = `hsl(${38 + rnd() * 10}, ${45 + rnd() * 20}%, ${62 + rnd() * 18}%)`;
+      g.beginPath();
+      g.ellipse(0, 0, 5, 2.2, 0, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.restore();
+  }
+  return tex(c, true, true);
+}
+
+// Hay: straw strands every which way.
+export function strawTexture() {
+  const [c, g] = canvas(256, 256);
+  const rnd = seeded(5);
+  g.fillStyle = '#b8902e';
+  g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 1800; i++) {
+    g.strokeStyle = `hsl(${40 + rnd() * 12}, ${55 + rnd() * 25}%, ${40 + rnd() * 35}%)`;
+    g.lineWidth = 1 + rnd() * 1.5;
+    const x = rnd() * 256;
+    const y = rnd() * 256;
+    const a = (rnd() - 0.5) * 0.9;
+    const l = 10 + rnd() * 30;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l);
+    g.stroke();
+  }
+  return tex(c);
+}
+
+// Knitting: rows of V stitches (white, tinted by the material).
+export function knitTexture() {
+  const [c, g] = canvas(64, 64);
+  g.fillStyle = '#d8d8d8';
+  g.fillRect(0, 0, 64, 64);
+  for (let y = 0; y < 64; y += 8)
+    for (let x = 0; x < 64; x += 8) {
+      g.strokeStyle = '#ffffff';
+      g.lineWidth = 2.5;
+      g.beginPath();
+      g.moveTo(x + 1, y + 1);
+      g.lineTo(x + 4, y + 7);
+      g.lineTo(x + 7, y + 1);
+      g.stroke();
+      g.strokeStyle = 'rgba(0,0,0,0.35)';
+      g.lineWidth = 1;
+      g.beginPath();
+      g.moveTo(x + 4, y + 7);
+      g.lineTo(x + 4, y + 8);
+      g.stroke();
+    }
+  return tex(c);
+}
+
+// Soft fur: fine strokes for the mice (white, tinted by the material).
+export function furTexture() {
+  const [c, g] = canvas(128, 128);
+  const rnd = seeded(17);
+  g.fillStyle = '#c8c8c8';
+  g.fillRect(0, 0, 128, 128);
+  for (let i = 0; i < 1400; i++) {
+    const v = 150 + rnd() * 105;
+    g.strokeStyle = `rgba(${v},${v},${v},0.55)`;
+    g.lineWidth = 1;
+    const x = rnd() * 128;
+    const y = rnd() * 128;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + 4 + rnd() * 4, y + (rnd() - 0.5) * 3);
+    g.stroke();
+  }
+  return tex(c);
+}
+
+// A stencilled word on a sack or a crate.
+export function stencilTexture(word, color = '#3a2414') {
+  const [c, g] = canvas(256, 128);
+  g.clearRect(0, 0, 256, 128);
+  g.fillStyle = color;
+  g.globalAlpha = 0.82;
+  g.font = 'bold 54px Georgia, serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(word, 128, 64);
+  g.globalCompositeOperation = 'destination-out';
+  const rnd = seeded(word.length * 31);
+  for (let i = 0; i < 160; i++) {
+    g.globalAlpha = rnd() * 0.6;
+    g.fillRect(rnd() * 256, rnd() * 128, 2 + rnd() * 4, 2 + rnd() * 4);
+  }
+  return tex(c, false);
+}
+
+// A small painting for the walls: hills, a cow, a cheese, or a portrait of a very serious cat.
+export function paintingTexture(kind = 0) {
+  const [c, g] = canvas(192, 144);
+  const rnd = seeded(kind * 19 + 3);
+  const sky = ['#9cb8d8', '#d8b88c', '#a8c0a0', '#c8a8b8'][kind % 4];
+  g.fillStyle = sky;
+  g.fillRect(0, 0, 192, 144);
+  g.fillStyle = '#5f7f4a';
+  g.beginPath();
+  g.moveTo(0, 100);
+  g.quadraticCurveTo(60, 70, 110, 95);
+  g.quadraticCurveTo(160, 115, 192, 90);
+  g.lineTo(192, 144);
+  g.lineTo(0, 144);
+  g.fill();
+  if (kind % 3 === 0) {
+    g.fillStyle = '#f2f0e8';
+    g.fillRect(70, 88, 34, 16);
+    g.fillStyle = '#2a2420';
+    g.fillRect(78, 90, 10, 8);
+    g.fillRect(74, 104, 4, 10);
+    g.fillRect(98, 104, 4, 10);
+  } else if (kind % 3 === 1) {
+    g.fillStyle = '#f2c14e';
+    g.beginPath();
+    g.moveTo(60, 110);
+    g.lineTo(130, 110);
+    g.lineTo(60, 76);
+    g.fill();
+  } else {
+    g.fillStyle = '#c8742a';
+    g.beginPath();
+    g.ellipse(96, 86, 30, 36, 0, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = '#1a1410';
+    g.fillRect(84, 80, 6, 3);
+    g.fillRect(102, 80, 6, 3);
+  }
+  g.globalAlpha = 0.12;
+  for (let i = 0; i < 300; i++) {
+    g.fillStyle = rnd() < 0.5 ? '#000' : '#fff';
+    g.fillRect(rnd() * 192, rnd() * 144, 3, 1);
+  }
+  return tex(c, false);
+}

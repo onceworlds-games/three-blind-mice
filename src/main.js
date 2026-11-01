@@ -7,6 +7,7 @@ import '@fontsource/barlow/700.css';
 import './style.css';
 import { createMatch, createHost, t } from '@onceworlds/sdk/match';
 import { createView } from './render/view.js';
+import { loadProps } from './render/assets.js';
 import { createUI } from './ui.js';
 import { createAudio } from './audio.js';
 import { createSession, viewFromSim, makeRing, STEP } from './core/session.js';
@@ -19,7 +20,7 @@ import { createRng } from './core/rng.js';
 import { holeMouth } from './core/mouse.js';
 import { RINGS, ringReachTime } from './core/rings.js';
 import { SEAT_CSS } from './render/echo.js';
-import { GLASSES } from './render/actors.js';
+import { GLASSES } from './looks.js';
 import { cleanProgress, loadProgress, mergeProgress, saveProgress, totalStars, unlockedNights, recordNight } from './progress.js';
 import { createHints } from './hints.js';
 
@@ -139,7 +140,7 @@ async function boot() {
 
   function cycleGlasses() {
     const stars = totalStars(progress);
-    const owned = GLASSES.map((g, i) => (stars >= g.stars ? i : -1)).filter((i) => i >= 0);
+    const owned = GLASSES.map((g, i) => (stars >= i * 6 ? i : -1)).filter((i) => i >= 0);
     const at = owned.indexOf(progress.glasses);
     progress.glasses = owned[(at + 1) % owned.length] ?? 0;
     persist();
@@ -648,11 +649,14 @@ async function boot() {
   );
   view.setQuality(settings().quality ?? 'medium');
 
+  // The props (barrels, jugs, the clock) load first: a room is built once, with them.
+  let propsReady = false;
+  Promise.race([loadProps(), new Promise((r) => setTimeout(r, 12000))]).then(() => (propsReady = true));
   function frame() {
     requestAnimationFrame(frame);
     // performance.now(), not the frame's timestamp: the same clock everywhere (a capture's virtual time moves only this one).
     const nowMs = performance.now();
-    if (document.hidden) {
+    if (document.hidden || !propsReady) {
       last = nowMs;
       return;
     }

@@ -5,7 +5,7 @@
 import { NIGHTS } from './core/levels.js';
 import { SEAT_CSS, SEAT_SHAPES, seatSvg } from './render/echo.js';
 import { HINTS } from './hints.js';
-import { GLASSES } from './render/actors.js';
+import { GLASSES } from './looks.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const el = (tag, cls, parent, text) => {

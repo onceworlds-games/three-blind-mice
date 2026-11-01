@@ -1,5 +1,6 @@
 // The signature: every sound is a ring of light. One set of uniforms (the live rings, the glows round mice, the hole and the
-// cheese, the memory of what has been squeaked) is read by every surface and by the edge lines.
+// cheese, the fading memory of what has been squeaked) is read by every surface, which lights up in amber as a ring passes,
+// and by the outline pass, which draws the edge of everything a ring touches. A cut-away keeps your mouse in view.
 
 import * as THREE from 'three';
 import { RINGS, MAX_RINGS } from '../core/rings.js';
@@ -32,12 +33,13 @@ export const echo = {
   uGlowCount: { value: 0 },
   uMem: { value: null },
   uMemInfo: { value: new THREE.Vector4(0, 0, 1, 1) },
-  uMemFloor: { value: 0.2 },
   uAmber: { value: new THREE.Color(PALETTE.amber) },
   uCream: { value: new THREE.Color(PALETTE.cream) },
   uTints: { value: [PALETTE.cream, ...SEAT_COLORS, PALETTE.moon, PALETTE.lantern].map((c) => new THREE.Color(c)) },
-  uFill: { value: 0.22 },
+  uFillGain: { value: 1 },
   uRimScale: { value: 1 },
+  // The cut-away: the mouse you're watching (xyz) and the radius (w) cleared round the line from the camera to it.
+  uCut: { value: new THREE.Vector4(0, 0, 0, 0) },
 };
 
 // Tint index per ring: 0 cream, 1-3 the seats, 4 moon (masking sounds), 5 lantern (the hunters' steps).
@@ -52,15 +54,13 @@ uniform vec4 uGlow[${MAX_GLOWS}];
 uniform int uGlowCount;
 uniform sampler2D uMem;
 uniform vec4 uMemInfo;
-uniform float uMemFloor;
 uniform vec3 uAmber;
 uniform vec3 uCream;
 uniform vec3 uTints[6];
-uniform float uFill;
-uniform float uRimScale;
 
-// reveal: how lit by echoes (0..1+), front: the ring's leading edge right here, tint: that ring's colour.
-void echoAt(vec2 p, out float reveal, out float front, out vec3 tint) {
+// reveal: how lit by echoes (0..1+), front: the ring's leading edge right here, tint: that ring's colour,
+// mem: the memory here (r: recent, fading; g: ever heard).
+void echoAt(vec2 p, out float reveal, out float front, out vec3 tint, out vec2 mem) {
   reveal = 0.0;
   front = 0.0;
   tint = uCream;
@@ -76,8 +76,7 @@ void echoAt(vec2 p, out float reveal, out float front, out vec3 tint) {
     float u = clamp(age / b.x, 0.0, 1.0);
     float r = maxR * (1.0 - (1.0 - u) * (1.0 - u));
     float strength = b.y;
-    // The leading edge, while it travels.
-    float band = exp(-pow((d - r) / (0.22 + maxR * 0.012), 2.0)) * (1.0 - u * u) * step(age, b.x + 0.05);
+    float band = exp(-pow((d - r) / (0.13 + maxR * 0.01), 2.0)) * (1.0 - u * u) * step(age, b.x + 0.05);
     float pat = b.w;
     if (pat > 0.5) {
       float ang = atan(p.y - a.y, p.x - a.x);
@@ -90,11 +89,10 @@ void echoAt(vec2 p, out float reveal, out float front, out vec3 tint) {
       front = band * strength;
       tint = uTints[int(b.z + 0.5)];
     }
-    // What it has passed lights up and fades: full for 0.4 s, a tenth by 2 s.
     if (d <= r) {
       float passAge = age - b.x * (1.0 - sqrt(max(0.0, 1.0 - d / maxR)));
-      float fade = passAge < 0.4 ? 1.0 : exp(-(passAge - 0.4) * 1.4);
-      fade *= 1.0 - 0.35 * (d / maxR);
+      float fade = passAge < 0.35 ? 1.0 : exp(-(passAge - 0.35) * 1.5);
+      fade *= 1.0 - 0.4 * (d / maxR);
       reveal = max(reveal, fade * strength);
     }
   }
@@ -102,18 +100,39 @@ void echoAt(vec2 p, out float reveal, out float front, out vec3 tint) {
     if (i >= uGlowCount) break;
     vec4 g = uGlow[i];
     float d = length(p - g.xy);
-    reveal = max(reveal, g.w * smoothstep(g.z, g.z * 0.25, d));
+    reveal = max(reveal, g.w * smoothstep(g.z, g.z * 0.2, d));
   }
   vec2 muv = (p - uMemInfo.xy) / uMemInfo.zw;
-  if (muv.x > 0.0 && muv.y > 0.0 && muv.x < 1.0 && muv.y < 1.0) reveal = max(reveal, texture2D(uMem, muv).r * uMemFloor);
+  mem = vec2(0.0);
+  if (muv.x > 0.0 && muv.y > 0.0 && muv.x < 1.0 && muv.y < 1.0) mem = texture2D(uMem, muv).rg;
 }
 `;
 
-// Surfaces: a faint fill where echoes pass, the ring's edge in its colour, everything else lit by real lights.
-export function patchEcho(material, { fill = 1, front = 1, rim = 0, seams = null, glow = null } = {}) {
+const GLSL_CUT = /* glsl */ `
+uniform vec4 uCut;
+void echoCut(vec3 wp) {
+  if (uCut.w <= 0.0 || wp.y < 0.32) return;
+  vec3 rd = uCut.xyz - cameraPosition;
+  float far = length(rd);
+  rd /= far;
+  vec3 op = wp - cameraPosition;
+  float along = dot(op, rd);
+  if (along > far - 0.25) return;
+  float perp = length(op - rd * along);
+  float n = fract(sin(dot(floor(gl_FragCoord.xy), vec2(12.9898, 78.233))) * 43758.5453);
+  if (perp < uCut.w * (0.72 + 0.28 * n)) discard;
+}
+`;
+
+// Surfaces: lit amber where echoes pass (their own colour, warmed), the ring's edge in its colour, everything else lit by
+// real lights. rim: a soft edge light for the characters. cut: cleared out of the way of your mouse.
+export function patchEcho(material, { fill = 1, front = 1, rim = 0, cut = true, glow = null } = {}) {
   material.userData.echoGlow = glow ?? { value: 0 };
+  material.userData.echoFill = { value: fill };
+  material.userData.echoFront = { value: front };
+  material.userData.echoRim = { value: rim };
   material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, echo, { uFillScale: { value: fill }, uFrontScale: { value: front }, uRim: { value: rim }, uSeams: { value: seams }, uSelfGlow: material.userData.echoGlow });
+    Object.assign(shader.uniforms, echo, { uFillScale: material.userData.echoFill, uFrontScale: material.userData.echoFront, uRim: material.userData.echoRim, uSelfGlow: material.userData.echoGlow });
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vEchoPos;\nvarying vec3 vEchoN;')
       .replace(
@@ -127,130 +146,109 @@ export function patchEcho(material, { fill = 1, front = 1, rim = 0, seams = null
         vEchoN = normalize(mat3(modelMatrix) * objectNormal);`,
       );
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying vec3 vEchoPos;\nvarying vec3 vEchoN;\nuniform float uFillScale;\nuniform float uFrontScale;\nuniform float uRim;\nuniform float uSelfGlow;\n${seams ? 'uniform sampler2D uSeams;' : ''}\n${GLSL_ECHO}`)
+      .replace('#include <common>', `#include <common>\nvarying vec3 vEchoPos;\nvarying vec3 vEchoN;\nuniform float uFillScale;\nuniform float uFrontScale;\nuniform float uRim;\nuniform float uSelfGlow;\nuniform float uFillGain;\nuniform float uRimScale;\n${GLSL_ECHO}\n${cut ? GLSL_CUT : ''}`)
+      .replace('void main() {', `void main() {\n${cut ? 'echoCut(vEchoPos);' : ''}`)
       .replace(
         '#include <emissivemap_fragment>',
         `#include <emissivemap_fragment>
         {
-          float rv; float fr; vec3 tint;
-          echoAt(vEchoPos.xz, rv, fr, tint);
-          totalEmissiveRadiance += diffuseColor.rgb * uFill * uFillScale * rv + uAmber * 0.05 * rv * uFillScale + tint * fr * 0.55 * uFrontScale;
-          totalEmissiveRadiance += diffuseColor.rgb * uSelfGlow;
-          ${seams ? 'float sm = texture2D(uSeams, vEchoPos.xz / 8.0).r; totalEmissiveRadiance += uAmber * sm * (rv * 0.8 + fr * 1.3);' : ''}
+          float rv; float fr; vec3 tint; vec2 mem;
+          echoAt(vEchoPos.xz, rv, fr, tint, mem);
+          vec3 alb = diffuseColor.rgb;
+          float lit = max(rv, mem.r * mem.r * 0.16);
+          totalEmissiveRadiance += (alb * 0.85 + 0.03) * uAmber * lit * uFillGain * uFillScale + tint * fr * 0.42 * uFrontScale;
+          totalEmissiveRadiance += alb * uSelfGlow;
           if (uRim > 0.0) {
             vec3 vd = normalize(cameraPosition - vEchoPos);
-            float f = pow(1.0 - abs(dot(vd, normalize(vEchoN))), 2.5);
-            totalEmissiveRadiance += uCream * f * uRim * uRimScale;
+            float f = pow(1.0 - abs(dot(vd, normalize(vEchoN))), 2.4);
+            totalEmissiveRadiance += uCream * f * uRim * uRimScale * (0.35 + rv);
           }
         }`,
       );
   };
-  // fill, front and rim are uniforms (each material keeps its own), so only the seams change the shader's text: fewer programs.
-  material.customProgramCacheKey = () => `echo${seams ? '-s' : ''}`;
+  material.customProgramCacheKey = () => `echo${cut ? '-c' : ''}`;
   return material;
 }
 
-// ---------------------------------------------------------------- edge lines: wide lines lit by echoes
+// ---------------------------------------------------------------- the outline pass
 
-const LINE_VERT = /* glsl */ `
-attribute vec3 aA;
-attribute vec3 aB;
-attribute vec2 aC;
-uniform vec2 uRes;
-uniform float uWidth;
-varying vec3 vW;
-varying float vSide;
-void main() {
-  vec4 ca = projectionMatrix * viewMatrix * vec4(aA, 1.0);
-  vec4 cb = projectionMatrix * viewMatrix * vec4(aB, 1.0);
-  vec2 sa = ca.xy / ca.w;
-  vec2 sb = cb.xy / cb.w;
-  vec2 dir = (sb - sa) * uRes;
-  float len = length(dir);
-  dir = len > 1e-5 ? dir / len : vec2(1.0, 0.0);
-  vec2 n = vec2(-dir.y, dir.x);
-  vec4 c = mix(ca, cb, aC.x);
-  c.xy += n * aC.y * uWidth / uRes * c.w;
-  c.z -= 0.0012 * c.w;
-  vW = mix(aA, aB, aC.x);
-  vSide = aC.y;
-  gl_Position = c;
-}
-`;
-
-const LINE_FRAG = /* glsl */ `
-${GLSL_ECHO}
-varying vec3 vW;
-varying float vSide;
-uniform float uBoost;
-void main() {
-  float rv; float fr; vec3 tint;
-  echoAt(vW.xz, rv, fr, tint);
-  float soft = 1.0 - smoothstep(0.55, 1.0, abs(vSide));
-  float i = rv * 0.95 + fr * 1.6;
-  if (i < 0.004) discard;
-  vec3 col = mix(uAmber, mix(uCream, tint, 0.35), clamp(fr * 1.4 + max(0.0, rv - 0.85) * 2.0, 0.0, 1.0));
-  gl_FragColor = vec4(col * i * uBoost * soft, 1.0);
-}
-`;
-
-export function edgeMaterial(width = 1.6) {
-  return new THREE.ShaderMaterial({
-    uniforms: { ...echo, uRes: { value: new THREE.Vector2(1, 1) }, uWidth: { value: width }, uBoost: { value: 1.25 } },
-    vertexShader: LINE_VERT,
-    fragmentShader: LINE_FRAG,
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-}
-
-// Segments ([ax, ay, az, bx, by, bz] each) into one mesh of screen-wide quads.
-export function edgeMesh(segments, material) {
-  const n = segments.length / 6;
-  const A = new Float32Array(n * 12);
-  const B = new Float32Array(n * 12);
-  const C = new Float32Array(n * 8);
-  const idx = new Uint32Array(n * 6);
-  const corners = [[0, -1], [0, 1], [1, 1], [1, -1]];
-  for (let s = 0; s < n; s++) {
-    for (let k = 0; k < 4; k++) {
-      const v = s * 4 + k;
-      for (let c = 0; c < 3; c++) {
-        A[v * 3 + c] = segments[s * 6 + c];
-        B[v * 3 + c] = segments[s * 6 + 3 + c];
-      }
-      C[v * 2] = corners[k][0];
-      C[v * 2 + 1] = corners[k][1];
+// Reads the scene's colour and depth: wherever depth jumps (a silhouette) or bends (a crease), draws a line lit by the
+// echoes at that spot: cream-hot at a ring's front, amber behind it, a fading trace where rings have been.
+export const EdgeShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    tDepth: { value: null },
+    uTexel: { value: new THREE.Vector2(1, 1) },
+    uSpread: { value: 1 },
+    uNear: { value: 0.5 },
+    uFar: { value: 100 },
+    uProjInv: { value: new THREE.Matrix4() },
+    uViewInv: { value: new THREE.Matrix4() },
+    uLine: { value: 1 },
+    uSil: { value: new THREE.Vector2(0.008, 0.03) },
+    uCrease: { value: new THREE.Vector2(0.0025, 0.009) },
+    ...echo,
+  },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`,
+  fragmentShader: /* glsl */ `
+    #include <packing>
+    ${GLSL_ECHO}
+    uniform sampler2D tDiffuse;
+    uniform sampler2D tDepth;
+    uniform vec2 uTexel;
+    uniform float uSpread;
+    uniform float uNear;
+    uniform float uFar;
+    uniform mat4 uProjInv;
+    uniform mat4 uViewInv;
+    uniform float uLine;
+    uniform vec2 uSil;
+    uniform vec2 uCrease;
+    varying vec2 vUv;
+    float dist(vec2 uv, out float raw) {
+      raw = texture2D(tDepth, uv).x;
+      return -perspectiveDepthToViewZ(raw, uNear, uFar);
     }
-    const b = s * 4;
-    idx.set([b, b + 1, b + 2, b, b + 2, b + 3], s * 6);
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('aA', new THREE.BufferAttribute(A, 3));
-  g.setAttribute('aB', new THREE.BufferAttribute(B, 3));
-  g.setAttribute('aC', new THREE.BufferAttribute(C, 2));
-  // A position attribute so three can compute bounds; the shader doesn't read it.
-  g.setAttribute('position', new THREE.BufferAttribute(A, 3));
-  g.setIndex(new THREE.BufferAttribute(idx, 1));
-  g.computeBoundingSphere();
-  const mesh = new THREE.Mesh(g, material);
-  mesh.frustumCulled = false;
-  mesh.renderOrder = 5;
-  return mesh;
-}
-
-// The edges of a geometry (with a transform) as segments.
-export function edgesOf(geometry, matrix, out, threshold = 28) {
-  const e = new THREE.EdgesGeometry(geometry, threshold);
-  const p = e.attributes.position;
-  const v = new THREE.Vector3();
-  for (let i = 0; i < p.count; i++) {
-    v.fromBufferAttribute(p, i).applyMatrix4(matrix);
-    out.push(v.x, v.y, v.z);
-  }
-  e.dispose();
-}
+    void main() {
+      vec4 col = texture2D(tDiffuse, vUv);
+      float r0; float rl; float rr; float ru; float rd;
+      vec2 o = uTexel * uSpread;
+      float z0 = dist(vUv, r0);
+      float zl = dist(vUv - vec2(o.x, 0.0), rl);
+      float zr = dist(vUv + vec2(o.x, 0.0), rr);
+      float zu = dist(vUv + vec2(0.0, o.y), ru);
+      float zd = dist(vUv - vec2(0.0, o.y), rd);
+      if (min(min(r0, rl), min(min(rr, ru), rd)) >= 0.99999) { gl_FragColor = col; return; }
+      float zn = min(z0, min(min(zl, zr), min(zu, zd)));
+      float jump = max(max(abs(zl - z0), abs(zr - z0)), max(abs(zu - z0), abs(zd - z0))) / zn;
+      float sil = smoothstep(uSil.x, uSil.y, jump);
+      float w0 = 1.0 / z0;
+      float lap = max(abs(1.0 / zl + 1.0 / zr - 2.0 * w0), abs(1.0 / zu + 1.0 / zd - 2.0 * w0)) / w0;
+      float crease = smoothstep(uCrease.x, uCrease.y, lap) * (1.0 - sil);
+      float e = max(sil, crease * 0.75);
+      if (e < 0.02) { gl_FragColor = col; return; }
+      // The edge belongs to the nearer surface: find where that is in the world.
+      vec2 uvn = vUv; float rn = r0;
+      if (zl <= zn + 1e-4) { uvn = vUv - vec2(o.x, 0.0); rn = rl; }
+      else if (zr <= zn + 1e-4) { uvn = vUv + vec2(o.x, 0.0); rn = rr; }
+      else if (zu <= zn + 1e-4) { uvn = vUv + vec2(0.0, o.y); rn = ru; }
+      else if (zd <= zn + 1e-4) { uvn = vUv - vec2(0.0, o.y); rn = rd; }
+      vec4 ndc = vec4(uvn * 2.0 - 1.0, rn * 2.0 - 1.0, 1.0);
+      vec4 vp = uProjInv * ndc;
+      vp /= vp.w;
+      vec3 wp = (uViewInv * vp).xyz;
+      float rv; float fr; vec3 tint; vec2 mem;
+      echoAt(wp.xz, rv, fr, tint, mem);
+      float lit = max(rv * (0.4 + 0.6 * rv), max(mem.r * 0.3, mem.g * 0.05));
+      vec3 line = mix(uAmber, uCream, clamp((rv - 0.7) * 2.0, 0.0, 1.0)) * lit * 1.5 + mix(uCream, tint, 0.45) * fr * 4.0;
+      gl_FragColor = vec4(col.rgb + line * e * uLine, col.a);
+    }`,
+};
 
 // ---------------------------------------------------------------- feeding the uniforms
 
@@ -267,30 +265,35 @@ export function setRings(rings, time) {
   echo.uRingCount.value = n;
 }
 
-export function setGlows(glows) {
-  const n = Math.min(MAX_GLOWS, glows.length);
+export function setGlows(glows, n = glows.length) {
+  n = Math.min(MAX_GLOWS, n);
   for (let i = 0; i < n; i++) echo.uGlow.value[i].set(glows[i][0], glows[i][1], glows[i][2], glows[i][3]);
   echo.uGlowCount.value = n;
 }
 
-// The memory of what's been squeaked: a small grid over the level, stamped as rings finish.
+// The memory of what's been heard: a small grid over the level, stamped as rings finish. Red fades (a recent echo), green
+// stays (it was heard once: a faint trace of the room's outlines).
 export function createMemory(W, D, perUnit = 4) {
   const w = W * perUnit;
   const h = D * perUnit;
-  const data = new Uint8Array(w * h);
-  const tex = new THREE.DataTexture(data, w, h, THREE.RedFormat, THREE.UnsignedByteType);
+  const recent = new Float32Array(w * h);
+  const data = new Uint8Array(w * h * 2);
+  const tex = new THREE.DataTexture(data, w, h, THREE.RGFormat, THREE.UnsignedByteType);
   tex.magFilter = THREE.LinearFilter;
   tex.minFilter = THREE.LinearFilter;
   tex.needsUpdate = true;
   echo.uMem.value = tex;
   echo.uMemInfo.value.set(0, 0, W, D);
+  let live = 0;
   return {
     tex,
     clear() {
+      recent.fill(0);
       data.fill(0);
       tex.needsUpdate = true;
+      live = 0;
     },
-    stamp(x, z, r, value = 255) {
+    stamp(x, z, r, value = 1, seen = 1) {
       const x0 = Math.max(0, Math.floor((x - r) * perUnit));
       const x1 = Math.min(w - 1, Math.ceil((x + r) * perUnit));
       const z0 = Math.max(0, Math.floor((z - r) * perUnit));
@@ -299,10 +302,31 @@ export function createMemory(W, D, perUnit = 4) {
         for (let i = x0; i <= x1; i++) {
           const d = Math.hypot((i + 0.5) / perUnit - x, (j + 0.5) / perUnit - z);
           if (d > r) continue;
-          const v = Math.round(value * (1 - 0.3 * (d / r)));
-          if (v > data[j * w + i]) data[j * w + i] = v;
+          const k = j * w + i;
+          const v = value * (1 - 0.35 * (d / r));
+          if (v > recent[k]) recent[k] = v;
+          const s = Math.round(255 * seen * (1 - 0.3 * (d / r)));
+          if (s > data[k * 2 + 1]) data[k * 2 + 1] = s;
         }
       }
+      live = 1;
+      tex.needsUpdate = true;
+    },
+    // Recent echoes fade (half-life about 9 s).
+    decay(dt) {
+      if (!live) return;
+      const k = Math.exp(-dt / 13);
+      let any = 0;
+      for (let i = 0; i < recent.length; i++) {
+        let v = recent[i];
+        if (v <= 0) continue;
+        v *= k;
+        if (v < 0.01) v = 0;
+        else any = 1;
+        recent[i] = v;
+        data[i * 2] = Math.round(v * 255);
+      }
+      live = any;
       tex.needsUpdate = true;
     },
     dispose() {
