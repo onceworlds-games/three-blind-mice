@@ -3,7 +3,8 @@
 // band for pause and a closed room. Plain DOM, laid out around the platform's own buttons.
 
 import { NIGHTS } from './core/levels.js';
-import { SEAT_CSS, SEAT_SYMBOLS } from './render/echo.js';
+import { SEAT_CSS, SEAT_SHAPES, seatSvg } from './render/echo.js';
+import { HINTS } from './hints.js';
 import { GLASSES } from './render/actors.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -14,6 +15,9 @@ const el = (tag, cls, parent, text) => {
   parent?.appendChild(e);
   return e;
 };
+const CHECK = '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+// What each night teaches, as the lobby card says it.
+const TEACH = { ...HINTS, creak: 'Mind the creaky boards', trap: 'Traps go snap', wheel: 'Roll a whole wheel', roam: 'The cat walks about', torch: "Dodge the farmer's torch", two: 'Two of them tonight', all: 'Everything at once' };
 const STAR_PATH = 'M12 1.8l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 17.9l-6.4 3.5 1.4-7.1-5.3-5 7.2-.9z';
 export const starSvg = (on, size = 26, color = '#FFD23F') =>
   `<svg viewBox="0 0 24 24" width="${size}" height="${size}"><path d="${STAR_PATH}" fill="${on ? color : 'none'}" stroke="${on ? color : 'rgba(255,241,214,0.55)'}" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
@@ -100,13 +104,13 @@ export function createUI(h) {
       b.disabled = !s.isHost || locked;
       b.style.pointerEvents = s.isHost && !locked ? 'auto' : 'none';
       const st = s.stars[i] ?? 0;
-      b.innerHTML = locked ? `${lockSvg}` : `${n}<small>${'★'.repeat(st)}</small>`;
+      b.innerHTML = locked ? `${lockSvg}` : `${n}<small>${starSvg(true, 12).repeat(st)}</small>`;
       b.setAttribute('aria-label', `Night ${n}${locked ? ', locked' : ''}`);
     });
     const night = NIGHTS[s.pick - 1];
     cN.textContent = `Night ${s.pick}`;
     cTitle.textContent = night.name;
-    cTeach.textContent = night.teach;
+    cTeach.textContent = TEACH[night.teach] ?? '';
     const st = s.stars[s.pick - 1] ?? 0;
     cMeta.innerHTML = `<span class="starrow">${starSvg(st >= 1)}${starSvg(st >= 2)}${starSvg(st >= 3)}</span>${s.best[s.pick - 1] ? `<span>Best ${fmtTime(s.best[s.pick - 1])}</span>` : ''}`;
     cAct.textContent = '';
@@ -144,14 +148,16 @@ export function createUI(h) {
           img.crossOrigin = 'anonymous';
           img.alt = '';
           img.src = p.avatar;
-        } else av.textContent = SEAT_SYMBOLS[i];
+        } else av.innerHTML = seatSvg(i, 26);
         el('b', '', who, p.me ? `${p.name} (you)` : p.name);
-        el('i', '', who, `${SEAT_SYMBOLS[i]} ${p.host ? 'Host' : GLASSES[p.g]?.name ?? ''}`);
-        if (p.ready || p.host) el('div', 'ok', seat, '✓');
+        const tag = el('i', '', who);
+        tag.innerHTML = seatSvg(i, 14);
+        tag.append(` ${p.host ? 'Host' : GLASSES[p.g]?.name ?? ''}`);
+        if (p.ready || p.host) el('div', 'ok', seat).innerHTML = CHECK;
         if (p.me) {
           seat.title = 'Change glasses';
           press(seat, () => h.onGlasses());
-          who.lastChild.textContent = `${SEAT_SYMBOLS[i]} ${GLASSES[p.g]?.name ?? ''} glasses`;
+          tag.lastChild.textContent = ` ${GLASSES[p.g]?.name ?? ''} glasses`;
         }
       } else {
         av.style.border = `2px dashed ${SEAT_CSS[i]}`;
@@ -268,10 +274,10 @@ export function createUI(h) {
       const r = a.firstChild;
       r.setAttribute('transform', `rotate(${(g.ang * 180) / Math.PI})`);
       r.firstChild.setAttribute('stroke', g.color);
-      const icon = g.kind === 'hole' ? archSvg : g.kind === 'cheese' ? cheeseIcon : `<text y="6" text-anchor="middle" font-size="16" fill="${g.color}" stroke="#0C0D18" stroke-width="1">${g.sym}</text>`;
-      if (a.lastChild.dataset.k !== g.kind + g.sym) {
+      const icon = g.kind === 'hole' ? archSvg : g.kind === 'cheese' ? cheeseIcon : `<path d="${SEAT_SHAPES[g.seat] ?? SEAT_SHAPES[0]}" transform="scale(7)" fill="${g.color}" stroke="#0C0D18" stroke-width="0.22"/>`;
+      if (a.lastChild.dataset.k !== g.kind + g.seat) {
         a.lastChild.innerHTML = icon;
-        a.lastChild.dataset.k = g.kind + g.sym;
+        a.lastChild.dataset.k = g.kind + g.seat;
       }
     });
     outEl.style.display = s.out ? '' : 'none';
@@ -324,7 +330,7 @@ export function createUI(h) {
     if (r.rows.length > 1) {
       for (const row of r.rows) {
         const d = el('div', '', rRows);
-        d.innerHTML = `<span style="color:${SEAT_CSS[row.seat] ?? '#fff'}">${SEAT_SYMBOLS[row.seat] ?? ''}</span>`;
+        d.innerHTML = `<span>${seatSvg(row.seat, 16)}</span>`;
         el('span', '', d, row.name + (row.me ? ' (you)' : ''));
         el('span', '', d, `${row.home} home`);
         el('span', '', d, row.tail ? 'tail' : 'bandaged');
@@ -383,13 +389,16 @@ export function createUI(h) {
     wipe.classList.add('go');
   };
 
-  // Around the platform's own buttons.
+  // Around the platform's own buttons (ui.insets keeps the numbers for the HUD's edge arrows).
+  ui.insets = { top: 70, bot: 12 };
   ui.layout = (areas) => {
     const st = document.documentElement.style;
     if (!areas) {
       st.setProperty('--top-l', '70px');
       st.setProperty('--top-r', '12px');
       st.setProperty('--bot', '12px');
+      st.setProperty('--stick', '0px');
+      ui.insets = { top: 70, bot: 12 };
       return;
     }
     const W = window.innerWidth;
@@ -397,15 +406,20 @@ export function createUI(h) {
     let topL = 0;
     let topR = 0;
     let bot = 0;
+    let stick = 0;
     for (const a of areas) {
       if (a.y + a.h < H * 0.5) {
         if (a.x < W * 0.5) topL = Math.max(topL, a.y + a.h);
         else topR = Math.max(topR, a.y + a.h);
       } else if (a.kind !== 'stick') bot = Math.max(bot, H - a.y);
+      else stick = Math.max(stick, H - a.y);
     }
+    // The hint sits above the stick too (it spans the middle of a phone).
+    st.setProperty('--stick', `${stick}px`);
     st.setProperty('--top-l', `${Math.max(12, topL)}px`);
     st.setProperty('--top-r', `${Math.max(12, topR)}px`);
     st.setProperty('--bot', `${Math.max(12, bot)}px`);
+    ui.insets = { top: Math.max(12, topL), bot: Math.max(12, bot) };
   };
   return ui;
 }

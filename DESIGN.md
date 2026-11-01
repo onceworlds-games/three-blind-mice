@@ -11,14 +11,14 @@ One rule explains the whole game, and the screen shows it every second: **every 
 draws the room, and the farmer's wife hears any ring that reaches her. The clock's tick, her footsteps, the cat's purr and
 a creaking board all paint the room the same way. Sound is how you see, and it's how you get caught.
 
-## The first 60 seconds
+## The first minute
 
 A first-time player, alone (the usual case: this is a friends game, so a new player starts in their own server).
 
 | Time | What happens | On screen |
 |---|---|---|
 | 0 s | The title. Black, then a squeak ring sweeps out from a mouse in the middle of a kitchen and draws it in amber lines: table legs, a stove, jars, floorboards. Three mice in round sunglasses sneak about (the autopilot). A warm lantern pool drifts across the floor at the edge. | **Three Blind Mice** in huge slab letters, drawn as outlines that light up as each ring passes. One **Play** button. Total stars beside it once there are any. |
-| 2 s | Tap Play (or Space or Enter). The music box starts. A player alone with no stars goes **straight into Night 1**: the host's own tap is the Start. Everyone else goes to the farmhouse map (the lobby). | A ring wipe from the button fills the screen (the screen transition everywhere). |
+| 2 s | Tap Play (or Space or Enter). The music box starts. A player alone with no stars goes **straight into Night 1**: the host's own tap is the Start. Everyone else goes to the lobby (the night strip). A friend who arrives by invite during that solo night watches it with **Join in** and is admitted at the hole at once; the host is never stuck alone while friends wait. | A ring wipe from the button fills the screen (the screen transition everywhere). |
 | 3 s | The intro (2.5 s): the camera drops from above onto the mousehole. The kitchen clock strikes midnight. DONG: one huge free ring reveals the whole room, the cheese pings yellow under the table, then the dark comes back. | **Night 1 · The Kitchen**, painted big, then gone. |
 | 6 s | Your mouse peeks out of the glowing hole. The dark is not empty: faint blue floor seams in the moonlight, your own whisker glow around you, the warm hole behind you, the cheese faintly glowing where the chime showed it. | Hint: **Squeak to see** (with the Space key or an arrow to the Squeak button). |
 | 8 s | You squeak: a chirp, a ring 6 u wide, the nearby table legs and jars light up in amber and fade over 2 s. Echo pings come back off each object, higher for the nearer ones. | Hint gone. After two small squeaks: **Hold for a big one**. |
@@ -73,7 +73,7 @@ light and the noise, repeat for every wedge before dawn.
   wedge stays where it fell. Home means the carrier reaches the hole's mouth.
 - **The night ends** when all the cheese is home, at dawn, or when every mouse still playing has been in the hole for 4 s
   with at least one wedge home (a ring of light fills the hole's arch while they wait; stepping out cancels it; hint the
-  first time: **Stay in to end the night**). Nobody is ever "game over" mid-night: a hit costs time, cheese and a star.
+  first time: **Wait in the hole**). Nobody is ever "game over" mid-night: a hit costs time, cheese and a star.
 
 ### Stars (per night)
 
@@ -207,24 +207,24 @@ All distances in u (1 u is about 15 cm at mouse scale: a mouse is 0.55 u long, h
 
 | | Number |
 |---|---|
-| Mouse speed / accel / radius | 3.0 u/s, 30 u/s², 0.22 u |
+| Mouse speed / accel / radius | 3.0 u/s, 30 u/s², 0.24 u against walls |
 | Carrying a wedge | 2.0 u/s |
 | The wheel (1 / 2 / 3 pushing one way) | 1.5 / 2.3 / 2.8 u/s; opposite inputs cancel |
 | Whisker glow | 1.6 u round your mouse |
 | Small squeak | ring 6 u in 0.5 s; 0.35 s cooldown |
 | Big squeak | hold 0.3-0.7 s to charge; ring 13 u in 0.9 s; 1.2 s cooldown |
-| Reveal | full for 0.4 s after the front passes, 10% by 2 s, gone by 8 s |
+| Reveal | full for 0.4 s after the front passes, a tenth by 2 s, then held at a fifth (the remembered outline) for the rest of the night wherever a ring has finished |
 | Cheese | glows faintly within 3.5 u; a ring that touches it pings it bright for 4 s |
 | Creaky board / crumbs / pan | a 3 u ring each 0.4 s you move on it |
 | Trap snap | hit, and a 12 u ring |
 | Wheel rolling | a 2.5 u ring every 0.5 s |
-| Wife: walk / search / chase | 1.6 / 2.2 / 2.5 u/s (solo ×0.9) |
+| Wife: walk / search / chase | 1.6 / 2.2 / 2.7 u/s (solo ×0.9; Night 1 slower still) |
 | Lantern pool | 3.8 u radius, centred 1.2 u ahead of her; spots a mouse after 0.3 s |
-| Knife | starts within 2.2 u; 0.8 s telegraph (solo 0.9); lead 0.45 s; hits within 0.85 u; recover 0.8 s |
+| Knife | starts within 2.4 u; 0.8 s telegraph (solo 0.9); lead 0.45 s (kept if it lands within reach + 1.5 u, else aimed where you are); hits within 0.85 u; recover 0.8 s |
 | Search | 5 s at the noise, sweeping the lantern, then back to her rounds |
 | Cat (asleep) | a ring that reaches her wakes her (1 s yawn); purr ring 1.5 u every 2 s |
 | Cat (awake) | walks to noises at 1.8 u/s; a ring that reaches her: crouch 0.4 s, leap at 12 u/s to its origin, hits within 0.8 u; back to sleep after 10 s of quiet (night 9: roams at 1.2 u/s) |
-| Farmer | walk 1.8, chase 2.6; torch beam 9 u long, 30° wide; stomp like the knife (radius 1.0) |
+| Farmer | walk 1.8, chase 2.6; torch beam 9 u long, 32° wide; stomp like the knife (within 2.0 u, radius 1.0) |
 | Clock chime (night 8) | every 20 s: a free 30 u ring, and 2.5 s in which no hunter hears anything |
 | The farmer's snore (night 9) | every 4.5 s: a 10 u ring, and 1.5 s in which no hunter hears anything |
 | Hits | 1st: tail, 0.8 s stun, 2 s safe; 2nd and after: out 8 s |
@@ -250,32 +250,33 @@ corners) and keeps the top centre clear for the platform's notes.
   name in the middle-top third, three lines on a phone held upright, one line on a wide screen; under it the **Play**
   button (an amber outlined slab label, 64 px tall, a ring pulses from it every 2 s), and **★ 14** beside it once earned.
   No tagline.
-- **Lobby (the farmhouse map).** The farm's floor plan drawn in amber lines in 3D, slowly turning a few degrees: kitchen,
-  pantry, hallway, cellar, dining room, larder, parlour, study, bedroom, then the barn, the dairy and the shop down the
-  lane. Each night's room shows its number and stars; locked rooms are dark with a padlock outline; the picked one is lit
-  with a lantern glow. A ring sweeps the map now and then. **The night card** (bottom right on wide screens, bottom on a
-  phone): "Night 4", "The Cellar", three stars, "Best 1:12", and the big **Start** (host) or **Ready** (others) button.
-  **The party** (left on wide screens, a row above the card on a phone): three seats, each a mouse figurine in its glasses
-  and scarf, the player's avatar head and name, a check when ready; empty seats are a dashed mouse outline with **Invite**.
-  Tapping your own mouse cycles your glasses.
+- **Lobby.** Behind it, the picked night's room in 3D, slowly orbiting, with a ring sweeping it every 3 s (the first one
+  the midnight chime from the hole). **The night strip** along the top: twelve numbered tiles with their stars, locked ones
+  dim with a padlock; the host taps one to pick it (others see the pick). **The night card** (bottom right on wide screens,
+  bottom on a phone): "Night 4", "The Cellar", what the night teaches in one line ("Traps go snap"), three stars, "Best
+  1:12", and the big **Start** (host) or **Ready** (others) button, or "Waiting for Ann". **The party** (left on wide
+  screens, a row above the card on a phone): three seats, each with the player's avatar head (or their seat's shape), name, the
+  seat's shape in its colour, a check when ready and a host marker; empty seats are dashed with **Invite**. Tapping your
+  own seat (or G) cycles your glasses.
 - **Intro.** "Night 4 · The Cellar" in big outlined slab letters lit by the midnight ring, over the reveal. 2.5 s.
 - **Play HUD.** Top right: the **night clock**, a crescent moon sinking along an amber arc toward a sunrise line, with the
   minutes left in big numerals beside it ("2:41"); under it the **tally**: an outlined wedge per wedge (and a round outline
   for the wheel) that fills yellow as each gets home. Everything else is in the world: your tail (on your mouse), the squeak
   charge (a ring preview around your mouse), names above friends' mice (white with a dark outline), friends off screen as
-  small arrows at the edge in their colour and symbol, the hole off screen as an amber arch arrow while you carry. Hints:
+  small arrows at the edge in their colour and shape. **The goal is always pointed to** when it's off screen: a yellow
+  wedge arrow to the nearest loose cheese, and an amber arch arrow to the hole while you carry. Hints:
   bottom centre, above the thumbs, 2-5 words in the slab face, gone after use. When she's chasing you, a warm-red edge
   creeps in from the sides (no flashing).
 - **Hints** (each once per player, saved, again only to a player who seems stuck): Squeak to see · Hold for a big one ·
-  Grab the cheese · Take it home · Stay out of her light · Hide under things · Drop it (the first chase while carrying) ·
-  Creaky boards · Square ping: trap · Don't wake the cat · Push it home · Lure her away · Move on the chime · Stay in to end
-  the night.
+  Grab the cheese · Take it home · Stay out of her light · Hide under things · Drop it and run (the first chase while
+  carrying) · Creaky boards · Square ping: trap · Don't wake the cat · Push it home · Lure her away · Move on the chime ·
+  Wait in the hole.
 - **Out.** Your view stays; your mouse is in the hole with stars circling its head and a big "8" counting down on the arch.
 - **Watching.** The night as the host sees it; "Watching" painted top left under the menu; **Join in** bottom centre.
 - **Morning (2 s).** The sky outside the windows turns pink, the room fills with soft dawn light, the hunters stop, the
   camera dives into the hole.
-- **Results.** Inside the mousehole: a warm burrow (a matchbox, a thimble, a cotton-reel table) with the mice on the cheese
-  that got home. **Morning** big. Three stars, each pinging in as a ring with its label (Cheese home, All the cheese, Every
+- **Results.** Inside the mousehole: a warm earthen burrow (a cotton-reel table, a thimble, a matchbox bed) with the mice,
+  in their glasses and tails or bandages, on the cheese that got home. **Morning** big. Three stars, each pinging in as a ring with its label (Cheese home, All the cheese, Every
   tail). The night's time and best; for co-op, one row per mouse: name, wedges home, tail or bandage. Buttons: **Next night**
   (big, N or Enter), **Again** (R), **Map** (M); for non-hosts "Waiting for Ann". A dawn with nothing home says **Dawn** and
   "No cheese", with **Again** big.
@@ -288,8 +289,8 @@ corners) and keeps the top centre clear for the platform's notes.
 **The world:** a farmhouse at night seen from the floor, as if built for a museum diorama: wide pine floorboards, plaster
 walls with skirting, a cast-iron stove, a dresser, flour sacks, enamel jugs, milk churns, a rag rug; the barn's hay and
 tin; a cheese shop's wheels on racks. Chunky low-poly with bevels and real materials that only show their colour in the
-lantern's light. Walls are cut away at 3 u like a dollhouse; the wife, a giant, is seen only from the knees down: felt
-slippers, striped stockings, an apron's hem, and the brass lantern swinging low in her hand. Her knife hand comes down from
+lantern's light. Walls facing the camera are cut down to 1 u like a dollhouse so they never hide the floor; the wife, a giant, is seen only from the knees down: felt
+slippers, striped stockings, a plum pleated skirt with a cream scalloped hem fading out above the knee, and the brass lantern swinging low in her hand. Her knife hand comes down from
 above the frame only to chop.
 
 **Palette (world and UI):**
@@ -304,7 +305,8 @@ above the frame only to chop.
 | Knife red | `#E23D2E` | Danger: the knife's outline, the chase edge |
 | Moon blue | `#7EA2FF` | Moonlight, masking sounds (chime, snore) |
 
-Player colours (scarves and their rings): blue `#7EA2FF` with ●, rose `#FF7FA8` with ▲, mint `#6FE0B0` with ■. Rings also
+Player colours (scarves and their rings): blue `#7EA2FF` with a circle, rose `#FF7FA8` with a triangle, mint `#6FE0B0`
+with a square (drawn as SVG, so they look the same on every device). Rings also
 differ by pattern (solid, dashed, dotted), so colour is never the only cue. Everything that matters has a shape: the
 cheese is a wedge, a trap is a square, the hole is an arch, the knife is its own silhouette.
 
@@ -321,11 +323,11 @@ soft shadows on high) so the floor seams always faintly show; the lantern is a s
 with shadows (map 1024 on medium, 2048 on high, none on low) that are also the game's hiding places. ACES tone mapping,
 sRGB, exponential fog into midnight. Bloom on the rings, the lantern flame and the cheese on medium and high only.
 
-**The reveal shader:** surfaces and edge lines read up to 12 live rings (centre, start time, size, speed) and up to 6 glow
-sources (mice, hole, cheese); edges come from the night's static shapes merged into one fat-line mesh (thin native lines on
-low quality). Surfaces get a faint fill as the ring passes; edges flare cream at the front, settle to amber and fade.
+**The reveal shader:** surfaces and edge lines read up to 12 live rings (centre, start time, size, speed), up to 10 glow
+sources (mice, hole, cheese) and the memory of finished rings; edges come from the night's static shapes merged into one
+fat-line mesh of screen-facing quads. Surfaces get a faint fill as the ring passes; edges flare cream at the front, settle to amber and fade.
 
-**Mice:** small charcoal velvet bodies, big round ears, round black sunglasses with a cream glint that sparkles when a ring
+**Mice:** small grey-mauve velvet bodies, big round ears, round black sunglasses with a cream glint that sparkles when a ring
 passes, a knitted scarf in the player's colour, a long pink tail that sways (until it doesn't). Squash on start and stop,
 a little hop on pick-up. Rim-lit by their own whisker glow. **Butter the cat:** a ginger cat in the dark, only her
 green-gold eyes and her purr rings showing until a ring draws her. **The farmer:** big muddy boots and a torch beam.
@@ -357,20 +359,24 @@ Synthesized Web Audio; sound is the game.
 
 ## Store art and the trailer
 
-- **Cover** (`thumb-1`): the kitchen mid-squeak, a huge amber ring sweeping out across table legs and jars, three mice in
-  sunglasses (one carrying a glowing wedge), the lantern's warm pool and a giant slipper coming round the corner on the
-  right. **Three Blind Mice** once, big.
-- **Action** (`thumb-2`): a close-up: a mouse mid-leap, the knife's shadow and red outline right over it, the blade coming
-  down out of the light. No text.
-- **Win** (`thumb-3`): three mice in the hole on a pile of cheese, warm light, one with a bandaged stub, the wheel behind.
-- **Multi** (`thumb-4`): three mice, three rings (solid, dashed, dotted) overlapping in their colours, the wheel between them.
-- **Icon:** a mouse face with round sunglasses, an amber ring reflected in the lenses, on midnight.
+All store art is rendered by the game itself (`?poster=<name>`, hand-staged scenes through the real view and shader, at
+high quality) and saved into `store/` by the posters tool.
+
+- **Cover** (`thumb-1`): the kitchen mid-squeak, a huge amber ring sweeping across table legs and jars, three mice in
+  sunglasses (one carrying a glowing wedge) and the wife's lantern pool coming in. **Three Blind Mice** once, big.
+- **Action** (`thumb-2`): a mouse in her light, the knife's shadow and red outline right over it, the blade coming down.
+  No text.
+- **Win** (`thumb-3`): the burrow, three mice on the cheese, one with a bandaged stub, **Morning** and three stars.
+- **Multi** (`thumb-4`): three mice, three rings (solid, dashed, dotted) overlapping in their colours, the wheel between
+  them, names in their seat shapes.
+- **Icon:** a mouse face with round sunglasses on midnight, an amber ring behind.
 - **Badges:** each a bold symbol (a ring, a wedge, a tail, a knife, a moon, a wheel, a sleeping cat, three mice, the
   farmhouse) on a coloured disc from the palette.
-- **Trailer (25-30 s):** (1) frame 0: a big squeak's ring already sweeping out, the kitchen drawing itself, the cheese pings;
-  (2) sneaking under the table as the lantern passes overhead; (3) a decoy squeak pulls her away while another mouse grabs
-  the wedge; (4) the knife's shadow, the chop lands a whisker away, then a tail pops off; (5) three mice rolling the wheel
-  into the hole, the stars; (6) the name over gameplay for the last 2 s. Captured with the autopilot driving every mouse.
+- **Trailer (`store/trailer.mp4`, 21.7 s):** real gameplay from the in-page autopilot night (no staging), cut from five
+  takes: frame 0 is the midnight ring mid-sweep drawing the Kitchen from the hole; three mice squeak the Dining Room into
+  view in their colours; her lantern finds a mouse in the Pantry; in the Larder the knife comes down, a tail pops and the
+  blade sticks in the floor; three mice roll the wheel home; the last wedge goes home, Morning, the burrow; the name over the
+  title's attract play for the last 2.8 s.
 
 ## Originality check
 
@@ -382,21 +388,35 @@ squeaks light the room for each other while one of them plays decoy.
 
 ## Tech
 
-Vite + three.js (with `Line2`/`LineMaterial` and the bloom pass from its addons) + GSAP for screen choreography;
-`@fontsource/alfa-slab-one` and `@fontsource/barlow`. `"dir": "dist"`, `base: './'`. Pure modules (no `window`, three.js
-or the SDK at import): `levels.js` (the twelve nights as data: rooms, walls, furniture, cover, noisy patches, traps, cheese,
-hole, hunters' routes, dawn, par), `world.js` (colliders, the nav grid, shadow and cover tests), `mouse.js` (movement),
-`hunters.js` (wife, cat, farmer), `rules.js` (rings, hearing, items, hits, stars, the end), `autopilot.js`, `rng.js`. Around
-them: rendering (`render/`), the reveal shader, UI, `audio.js`, `net.js` (room, match, host), `poster.js`, `main.js`.
-Static geometry merged per material, props instanced; under ~150 draw calls. Poster mode and an autoplay flag
-(`?autoplay=1`, not in production) for the store art and the trailer.
+Vite + three.js (the bloom pass and `mergeGeometries` from its addons; the fat edge lines are the game's own quad mesh),
+`@fontsource/alfa-slab-one` and `@fontsource/barlow`, `@onceworlds/sdk/match` (`createMatch`, `createHost`). No GSAP:
+screen moves are CSS transitions. `"dir": "dist"`, `base: './'`.
+
+- **Pure modules** (`src/core`, no `window`, three.js or SDK at import; the node tests run them): `levels.js` (the twelve
+  nights as text maps plus data), `world.js` (cells, colliders, the nav grids, light and cover tests), `mouse.js`,
+  `rings.js`, `hunters.js`, `night.js` (the night record: items, hits, stars, the end), `autopilot.js`, `rng.js`,
+  `sim.js` (a whole night with autopilot mice: the title, the trailer and the balance tests), `session.js` (the live
+  night split across pages over a room), `localroom.js` (an in-memory room with the SDK's shape, for the tests and for
+  playing outside the platform).
+- **Around them:** `render/` (the view and camera, the echo shader and memory, the level, actors, burrow, canvas
+  textures), `ui.js` (plain DOM), `audio.js` (Web Audio, all synthesized), `hints.js`, `progress.js`, `poster.js`,
+  `main.js`.
+- **Shaders:** the echo patch is one program per base material (fill, front and rim are per-material uniforms), about 15
+  programs in all. A new room compiles with `compileAsync` (off the main thread where the browser can) and draws once
+  ready; hunters' lights go dark rather than hidden, since a light that comes and goes recompiles every shader. A GPU drawn
+  in software (SwiftShader, llvmpipe) always plays on low: no bloom, no shadows.
+- **Local-only switches** (ignored on onceworlds.com): `?autoplay=1` (the autopilot plays your mouse); with `mice=1-3`,
+  `night`, `seed`, `careless=1`, `focus=<n>`, `zoom=<x>`, `skipintro=1`, `cam=wide`, `wait=1` and `ring0=<s>` it runs a
+  whole night in the page with every mouse on autopilot (the trailer); `?poster=<name>` renders store art. Build-time `VITE_NIGHT`,
+  `VITE_LOBBY` and `VITE_AUTOPLAY` exist only for local screenshots.
 
 ## Risks
 
 - **Dark reads as empty** (thumbnails, the first seconds). The midnight chime reveals every room at the start, the floor's
   moonlit seams, the hole's beacon, the cheese glow, the lantern always lit; the title keeps rings going.
-- **The shader on phones.** Rings capped at 12, fat lines and bloom only above low quality, pixel ratio from
-  `ow.settings.pixelRatio`, quality changes followed live.
+- **The shader on phones.** Rings capped at 12, bloom and shadows only above low quality, pixel ratio from
+  `ow.settings.pixelRatio`, quality changes followed live; few shader programs, compiled ahead of the first frame that
+  needs them.
 - **Rules nobody can see** (what hears what). One visible rule, rings, and the hunters react to rings only; every
   reaction shows ("Hm?", the lifted lantern, the cat's crouch, the knife's shadow).
 - **Co-op netcode** (the knife, the wheel). Victim-judged hits; the wheel has one owner at a time; everything the host

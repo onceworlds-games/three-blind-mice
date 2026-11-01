@@ -127,7 +127,7 @@ canvas#gl {
 }
 .btn .key {
   font-family: var(--sans);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   opacity: 0.7;
   margin-left: 10px;
@@ -254,21 +254,16 @@ canvas#gl {
   padding: 0;
 }
 .nt small {
-  font-family: var(--sans);
-  font-size: 11px;
-  letter-spacing: 1px;
-  color: var(--cheese);
-  height: 12px;
-  line-height: 12px;
+  display: flex;
+  gap: 1px;
+  align-items: center;
+  height: 18px;
 }
 .nt.sel {
   background: var(--amber);
   color: var(--midnight);
   border-color: var(--amber);
   box-shadow: 0 0 18px rgba(244, 168, 53, 0.6);
-}
-.nt.sel small {
-  color: var(--midnight);
 }
 .nt.locked {
   opacity: 0.38;
@@ -277,6 +272,14 @@ canvas#gl {
 .nt svg {
   width: 18px;
   height: 18px;
+}
+.nt small svg {
+  width: 12px;
+  height: 12px;
+}
+.nt.sel small svg path {
+  fill: var(--midnight);
+  stroke: var(--midnight);
 }
 #lobby .card {
   position: absolute;
@@ -501,7 +504,7 @@ canvas#gl {
 #hud .hint {
   position: absolute;
   left: 50%;
-  bottom: calc(var(--bot) + 18px);
+  bottom: calc(max(var(--bot), var(--stick, 0px)) + 18px);
   transform: translateX(-50%);
   font-family: var(--slab);
   font-size: 26px;
@@ -691,6 +694,13 @@ canvas#gl {
   .pulse::after,
   .ripple {
     animation: none;
+    display: none;
+  }
+}
+
+/* Keyboard hints only where there's a keyboard. */
+@media (hover: none) {
+  .btn .key {
     display: none;
   }
 }

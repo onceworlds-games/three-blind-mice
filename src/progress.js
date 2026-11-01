@@ -22,11 +22,22 @@ let memory = null;
 export async function loadProgress(ow) {
   if (!ow?.save?.get) return (memory ??= fresh());
   try {
-    const raw = await Promise.race([ow.save.get(KEY), new Promise((r) => setTimeout(() => r(null), 4000))]);
-    return cleanProgress(raw);
+    return cleanProgress(await ow.save.get(KEY));
   } catch {
     return fresh();
   }
+}
+
+// The saved progress arriving after the page has already played: keep the best of both.
+export function mergeProgress(into, p) {
+  for (let i = 0; i < NIGHT_COUNT; i++) {
+    into.stars[i] = Math.max(into.stars[i], p.stars[i]);
+    if (p.best[i] && (!into.best[i] || p.best[i] < into.best[i])) into.best[i] = p.best[i];
+    if (p.fewest[i] && (!into.fewest[i] || p.fewest[i] < into.fewest[i])) into.fewest[i] = p.fewest[i];
+  }
+  if (!into.glasses) into.glasses = p.glasses;
+  for (const k of Object.keys(p.hints)) into.hints[k] = 1;
+  return into;
 }
 
 export function saveProgress(ow, p) {

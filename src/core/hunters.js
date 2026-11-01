@@ -323,7 +323,6 @@ function tickCat(h, ctx, now, dt, events) {
   const { world } = ctx;
   const c = HUNTER.cat;
   const roamer = world.cat?.mode === 'roam';
-  const awake = h.m !== 'sleep' && h.m !== 'wake' && h.m !== 'crouch' && h.m !== 'leap' && h.m !== 'land';
   const heard = h.m === 'crouch' || h.m === 'leap' ? null : loudest(heardBetween(ctx.rings, h.x, h.z, ctx.prev, now, 'cat'));
 
   const react = (ring) => {
@@ -429,7 +428,6 @@ function tickCat(h, ctx, now, dt, events) {
     default:
       setMode(h, roamer ? 'roam' : 'sleep', now);
   }
-  void awake;
 }
 
 // The danger zone a hunter is about to strike, for the autopilot and the pages' own hit checks: { x, z, r, at } or null.

@@ -3,12 +3,10 @@
 
 import * as THREE from 'three';
 import { createView } from './render/view.js';
-import { createSim, STEP } from './core/sim.js';
+import { createSim } from './core/sim.js';
 import { viewFromSim } from './core/session.js';
-import { carrying } from './core/night.js';
-import { isCover } from './core/world.js';
 import { createMouseModel, poseMouse, createWedge, createWheel, createCat, poseCat, createHuman } from './render/actors.js';
-import { SEAT_CSS, SEAT_SYMBOLS, echo } from './render/echo.js';
+import { SEAT_CSS, seatSvg, echo } from './render/echo.js';
 import { starSvg } from './ui.js';
 
 const W = innerWidth;
@@ -33,24 +31,6 @@ export async function runPoster(name) {
 
 // ------------------------------------------------------------ staging a night
 
-// Run a seeded night and stop it at the moment `score` likes best (a second run replays to it: the sim is deterministic).
-function bestMoment({ night, mice = 3, seeds, maxT, score, careless = false }) {
-  const ids = ['m1', 'm2', 'm3'].slice(0, mice);
-  const make = (seed) => createSim({ night, ids, seed, skill: careless ? [0.9, 0.5, 0.45] : [0.95, 0.9, 0.85], careless: careless ? [false, true, true] : false, solo: mice === 1 });
-  let best = { s: -Infinity, seed: seeds[0], i: 0 };
-  for (const seed of seeds) {
-    const sim = make(seed);
-    for (let i = 1; sim.now < maxT && !sim.ended; i++) {
-      sim.step(STEP);
-      const s = score(sim);
-      if (s > best.s) best = { s, seed, i };
-    }
-  }
-  const sim = make(best.seed);
-  for (let i = 0; i < best.i; i++) sim.step(STEP);
-  return sim;
-}
-
 // A night set by hand: mice at [x, z, heading, speed], one of them carrying item 0, the hunters placed by `hunters`.
 function staged(night, { mice, carry = -1, hunters = null, now = 30 }) {
   const ids = ['m1', 'm2', 'm3'].slice(0, mice.length);
@@ -61,10 +41,6 @@ function staged(night, { mice, carry = -1, hunters = null, now = 30 }) {
   hunters?.(sim.hunters, sim);
   return sim;
 }
-
-const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
-const playing = (sim) => sim.mice.filter((m) => m.st === 'play');
-const carrierOf = (sim) => playing(sim).find((m) => carrying(sim.data, m.id) >= 0) ?? null;
 
 function makeView() {
   const canvas = document.getElementById('gl');
@@ -131,7 +107,6 @@ function scene(name) {
     vm.focus = vm.mice[0];
     aim(view, sim.world, 15.4, 5.5, 5.6, (60 * Math.PI) / 180);
     shoot(view, vm);
-    overlay(`<div class="pt-cap"><div class="slab solid">Mind the knife</div></div>`);
     return;
   }
   if (name === 'multi') {
@@ -166,7 +141,7 @@ function scene(name) {
     const tags = vm.mice
       .map((m, i) => {
         view.project(m.x, 1.0, m.z, p);
-        return p.on ? `<div class="pt-tagname" style="left:${p.x}px;top:${p.y}px;color:${SEAT_CSS[m.seat]}">${SEAT_SYMBOLS[m.seat]} ${names[i]}</div>` : '';
+        return p.on ? `<div class="pt-tagname" style="left:${p.x}px;top:${p.y}px;color:${SEAT_CSS[m.seat]}">${seatSvg(m.seat, 22)} ${names[i]}</div>` : '';
       })
       .join('');
     overlay(`${tags}<div class="pt-cap"><div class="slab solid">Bring two friends</div></div>`);

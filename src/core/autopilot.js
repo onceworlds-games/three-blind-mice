@@ -5,7 +5,7 @@
 import { findPath, isCover, noiseAt, clearAt, navNode, nodeXZ } from './world.js';
 import { holeMouth, MOUSE } from './mouse.js';
 import { carrying } from './night.js';
-import { HUNTER, lanternOf, canSee, strikeOf } from './hunters.js';
+import { HUNTER, lanternOf, strikeOf } from './hunters.js';
 import { RINGS } from './rings.js';
 
 export function createBrain({ skill = 0.8, careless = false, role = '', rng }) {

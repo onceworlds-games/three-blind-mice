@@ -204,7 +204,6 @@ export function createSim({ night, ids = ['m1'], seed = 1, skill = 0.8, careless
       const z = item.k === 'W' ? item.z : m.z;
       if (home(data, world, now, m.id, x, z) === '') sim.events.push({ type: 'home', id: m.id, i: now });
     }
-    void ci;
   }
 
   sim.run = (seconds, onStep) => {

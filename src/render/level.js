@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { patchEcho, edgeMesh, edgesOf, PALETTE } from './echo.js';
+import { patchEcho, edgesOf, PALETTE } from './echo.js';
 import { floorTextures, rugTexture, quiltTexture, patchTexture, doormatTexture } from './textures.js';
 
 export const WALL_H = 3.0;

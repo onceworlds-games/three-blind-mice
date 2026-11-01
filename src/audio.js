@@ -167,8 +167,7 @@ export function createAudio() {
     },
     creak() {
       const t = T();
-      const o = tone('sawtooth', 110, 190, t, 0.32, 0.08, sfxBus, 0.03);
-      void o;
+      tone('sawtooth', 110, 190, t, 0.32, 0.08, sfxBus, 0.03);
       noise(t, 0.3, 0.12, 'bandpass', 400, 1100, 12, sfxBus, 0.03);
     },
     crumbs() {
@@ -385,7 +384,6 @@ export function createAudio() {
       if (nextT < ctx.currentTime - 0.5) nextT = ctx.currentTime + 0.05;
       while (nextT < ahead) {
         const [note, len] = TUNE[step % TUNE.length];
-        const phrase = Math.floor(step / 6) % 8;
         if (step % TUNE.length === 0) phraseOn = true;
         const play = mode === 'menu' || (mode === 'play' && (danger > 0.5 || phraseOn));
         if (play && note) {
@@ -398,7 +396,6 @@ export function createAudio() {
         }
         // While playing: the tune comes and goes in fragments.
         if (mode === 'play' && step % 12 === 11) phraseOn = Math.random() < 0.45;
-        void phrase;
         nextT += eighth() * len;
         step++;
       }

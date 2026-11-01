@@ -24,6 +24,16 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // A GPU drawn in software (SwiftShader, llvmpipe) takes seconds per shader and can't keep up with bloom or shadows: it
+  // always plays on low, whatever the setting says.
+  let software = false;
+  try {
+    const gl = renderer.getContext();
+    const info = gl.getExtension('WEBGL_debug_renderer_info');
+    software = /swiftshader|llvmpipe|softpipe|software/i.test(String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER)));
+  } catch {
+    /* unknown: trust the setting */
+  }
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(PALETTE.midnight);
   scene.fog = new THREE.Fog(PALETTE.midnight, 30, 70);
@@ -52,6 +62,7 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
     level: null,
     world: null,
     mode: 'follow',
+    zoom: 1,
     cam: { x: 0, z: 0, tx: 0, tz: 0, dist: 30, yaw: 0, introT: 0 },
     posterCam: { x: 0, z: 0, span: 13 },
     trauma: 0,
@@ -90,8 +101,8 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
   }
 
   v.setQuality = (q) => {
-    v.quality = q;
-    renderer.shadowMap.enabled = q !== 'low';
+    v.quality = software && !poster ? 'low' : q;
+    renderer.shadowMap.enabled = v.quality !== 'low';
     for (const [, hm] of v.humans) applyShadow(hm);
     scene.traverse((o) => {
       if (o.material) for (const m of [].concat(o.material)) m.needsUpdate = true;
@@ -196,8 +207,36 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
     moon.position.set(world.W * 0.3 - 6, 22, world.D * 0.2 - 6);
     moon.target.position.set(world.W / 2, 0, world.D / 2);
     renderer.shadowMap.needsUpdate = true;
-    v.setQuality(v.quality);
+    // Only the new hunters' shadows: rebuilding the composer here would throw its compiled programs away every night.
+    for (const [, hm] of v.humans) applyShadow(hm);
+    warm(scene, camera);
   };
+
+  // Shaders compile off the main thread where the browser can (KHR_parallel_shader_compile): a new room or the burrow draws
+  // once its programs are ready, so a slow GPU never freezes the page (or its room's messages) for seconds.
+  let compiling = 0;
+  let compileUntil = 0;
+  const warmed = new WeakSet();
+  function warm(sc, cam) {
+    if (poster || !renderer.compileAsync) return;
+    warmed.add(sc);
+    compiling++;
+    compileUntil = performance.now() + 25000;
+    // Compiled for where it will be drawn: the composer's buffer (no tone mapping in the shader) or the screen.
+    // Everything that will show later (actors hidden until their moment) compiles now too.
+    renderer.setRenderTarget(v.composer ? v.composer.readBuffer : null);
+    const hidden = [];
+    sc.traverse((o) => {
+      if (!o.visible && !o.isLight) {
+        hidden.push(o);
+        o.visible = true;
+      }
+    });
+    const ready = renderer.compileAsync(sc, cam);
+    for (const o of hidden) o.visible = false;
+    renderer.setRenderTarget(null);
+    ready.catch(() => {}).finally(() => compiling--);
+  }
 
   // ------------------------------------------------------------ the camera
   function viewDistance(span) {
@@ -244,7 +283,7 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
         c.tx = f.x + Math.cos(f.a) * ahead;
         c.tz = f.z + Math.sin(f.a) * ahead;
       }
-      span = v.mode === 'attract' ? 16 : v.w < v.h ? 11.5 : 13;
+      span = (v.mode === 'attract' ? 16 : v.w < v.h ? 11.5 : 13) / v.zoom;
       // Keep the view on the room: no more of the dark outside than the room needs.
       const d0 = viewDistance(span);
       const halfV = Math.tan(((FOV / 2) * Math.PI) / 180);
@@ -388,10 +427,11 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
   }
 
   // ------------------------------------------------------------ the frame
-  const tmp = new THREE.Vector3();
   v.render = (vm, dt) => {
     if (v.mode === 'burrow') {
       burrow.update(vm, dt, v.reduced);
+      if (!warmed.has(burrow.scene)) warm(burrow.scene, burrow.camera);
+      if (compiling && performance.now() < compileUntil) return;
       echo.uRimScale.value = 0.25;
       if (v.bloom) {
         v.bloom.strength = 0.3;
@@ -436,8 +476,13 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
     for (const [k, hm] of v.humans) {
       const h = vm.hunters.find((x) => x.k === k);
       hm.root.visible = !!h;
-      hm.light.visible = !!h;
-      if (!h) continue;
+      if (hm.beam) hm.beam.visible = !!h;
+      if (!h) {
+        // Dark, not hidden: a light that comes and goes changes every shader's light count (a recompile of the room).
+        hm.light.intensity = 0;
+        hm.pool.visible = hm.knife.visible = hm.strikeShadow.visible = hm.strikeLine.visible = false;
+        continue;
+      }
       poseHuman(hm, h, vm.now, dt, v.reduced);
       if (h.ch && h.ch.at <= vm.now && hm.lastSeq !== h.ch.seq) {
         hm.lastSeq = h.ch.seq;
@@ -448,6 +493,7 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
       const h = vm.hunters.find((x) => x.k === 'cat');
       v.cat.root.visible = !!h;
       if (h) poseCat(v.cat, h, vm.now, dt, v.reduced);
+      else v.cat.strikeLine.visible = false;
     }
     // Cheese.
     vm.items.forEach((it, i) => {
@@ -496,7 +542,6 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
       top.fade += ((under ? 0.22 : 1) - top.fade) * Math.min(1, dt * 8);
       top.mesh.material.opacity = top.fade;
       top.mesh.material.depthWrite = top.fade > 0.95;
-      top.mesh.castShadow = true;
     }
     // Animated bits: the clock's pendulum, the door she comes in by.
     for (const a of v.level.animated) {
@@ -510,7 +555,7 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
       }
     }
     placeCamera(dt, vm);
-    tmp.set(0, 0, 0);
+    if (compiling && performance.now() < compileUntil) return;
     if (v.composer) v.composer.render(dt);
     else renderer.render(scene, camera);
   };

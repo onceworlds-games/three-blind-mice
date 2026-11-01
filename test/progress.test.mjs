@@ -1,7 +1,7 @@
 // Saved progress and hints: garbage cleaned, nights unlocking, best times kept, each hint shown once.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanProgress, unlockedNights, recordNight, totalStars, loadProgress } from '../src/progress.js';
+import { cleanProgress, unlockedNights, recordNight, totalStars, loadProgress, mergeProgress } from '../src/progress.js';
 import { createHints, HINTS } from '../src/hints.js';
 
 test('progress from storage is cleaned', () => {
@@ -46,6 +46,19 @@ test('without the platform, progress lives in memory', async () => {
   const q = await loadProgress({ save: { get: async () => ({ v: 1, stars: [1] }) } });
   assert.equal(q.stars[0], 1);
   assert.ok(Date.now() - started < 1000);
+});
+
+test('a save that loads late is merged with what was played meanwhile, keeping the best of both', () => {
+  const played = cleanProgress(null);
+  played.stars[0] = 2;
+  played.best[0] = 50;
+  const saved = cleanProgress({ v: 1, stars: [3, 1], best: [60, 90], fewest: [4], glasses: 2, hints: { squeak: 1 } });
+  mergeProgress(played, saved);
+  assert.deepEqual(played.stars.slice(0, 3), [3, 1, 0]);
+  assert.deepEqual(played.best.slice(0, 2), [50, 90]);
+  assert.equal(played.fewest[0], 4);
+  assert.equal(played.glasses, 2);
+  assert.equal(played.hints.squeak, 1);
 });
 
 test('hints: short, one at a time, each once, remembered', () => {

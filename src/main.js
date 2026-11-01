@@ -7,26 +7,26 @@ import '@fontsource/barlow/700.css';
 import './style.css';
 import { createMatch, createHost, t } from '@onceworlds/sdk/match';
 import { createView } from './render/view.js';
-import { createUI, fmtTime } from './ui.js';
+import { createUI } from './ui.js';
 import { createAudio } from './audio.js';
-import { createSession, viewFromSim, worldFor, makeRing, STEP } from './core/session.js';
+import { createSession, viewFromSim, makeRing, STEP } from './core/session.js';
 import { createSim } from './core/sim.js';
 import { soloRoom } from './core/localroom.js';
-import { NIGHTS, NIGHT_COUNT } from './core/levels.js';
+import { NIGHT_COUNT } from './core/levels.js';
 import { carrying } from './core/night.js';
 import { createBrain, think } from './core/autopilot.js';
 import { createRng } from './core/rng.js';
 import { holeMouth } from './core/mouse.js';
 import { RINGS, ringReachTime } from './core/rings.js';
-import { SEAT_CSS, SEAT_SYMBOLS } from './render/echo.js';
+import { SEAT_CSS } from './render/echo.js';
 import { GLASSES } from './render/actors.js';
-import { cleanProgress, loadProgress, saveProgress, totalStars, unlockedNights, recordNight } from './progress.js';
+import { cleanProgress, loadProgress, mergeProgress, saveProgress, totalStars, unlockedNights, recordNight } from './progress.js';
 import { createHints } from './hints.js';
 
 const ow = window.onceworlds ?? null;
 const q = new URLSearchParams(location.search);
 const LOCAL = !ow || ow.mode !== 'platform' || /(^|\.)localhost$|^127\.0\.0\.1$|^\[::1\]$/.test(location.hostname);
-const AUTO = LOCAL && (q.get('autoplay') === '1' || q.get('autoplay') === 'true');
+const AUTO = LOCAL && (q.get('autoplay') === '1' || q.get('autoplay') === 'true' || !!import.meta.env?.VITE_AUTOPLAY);
 const AUTO_TO = LOCAL ? q.get('autoplay-to') : null;
 const ENV_NIGHT = Number(import.meta.env?.VITE_NIGHT) || 0;
 
@@ -52,8 +52,7 @@ const safe = (fn) => {
 const settings = () => ow?.settings ?? { quality: 'medium', reducedMotion: false, pixelRatio: (m) => Math.min(window.devicePixelRatio || 1, m) };
 
 if (q.get('poster')) import('./poster.js').then((m) => m.runPoster(q.get('poster')));
-else
-  boot().catch(showError);
+else boot().catch(showError);
 
 async function boot() {
   const canvas = document.getElementById('gl');
@@ -61,9 +60,26 @@ async function boot() {
   view.reduced = !!settings().reducedMotion;
   const audio = createAudio();
   const progress = cleanProgress(null);
-  const hints = createHints(progress, () => saveProgress(ow, progress));
+  // Nothing is saved until the saved progress has loaded and been merged in (or 15 s have gone by), so a slow load never
+  // overwrites it; a load that arrives later still merges, and the best of both is saved.
+  let progressLoaded = false;
+  let saveWaiting = false;
+  const persist = () => {
+    if (progressLoaded) saveProgress(ow, progress);
+    else saveWaiting = true;
+  };
+  const loaded = () => {
+    if (progressLoaded) return;
+    progressLoaded = true;
+    if (saveWaiting) persist();
+  };
+  setTimeout(loaded, 15000);
+  const hints = createHints(progress, persist);
   loadProgress(ow).then((p) => {
-    Object.assign(progress, p);
+    const late = progressLoaded;
+    mergeProgress(progress, p);
+    loaded();
+    if (late) persist();
     ui.title({ stars: totalStars(progress) });
   });
   const reduced = () => view.reduced;
@@ -89,11 +105,13 @@ async function boot() {
     session.match.on('results', () => onResults());
     room.on('close', (reason) => onClosed(reason));
   }
-  join().then((r) => {
-    room = r;
-    makeSession();
-    if (wantQuick) quick(wantQuick);
-  });
+  join()
+    .then((r) => {
+      room = r;
+      makeSession();
+      if (wantQuick) quick(wantQuick);
+    })
+    .catch(showError);
 
   // ------------------------------------------------------------ screens
   let screen = 'title';
@@ -102,21 +120,21 @@ async function boot() {
     sfx: (n) => audio.play(n),
     reduced,
     onPlay: () => play(),
-    onPick: (n) => session.setPick(n),
-    onReady: () => session.ready(!room.me?.ready),
-    onStart: () => session.start(),
+    onPick: (n) => session?.setPick(n),
+    onReady: () => session?.ready(!room.me?.ready),
+    onStart: () => session?.start(),
     onInvite: () => safe(() => ow?.ui?.showInvite?.()),
     onGlasses: () => cycleGlasses(),
     onNext: () => resultsAction('next'),
     onAgain: () => resultsAction('again'),
     onMap: () => resultsAction('map'),
-    onJoinIn: () => session.joinIn(),
+    onJoinIn: () => session?.joinIn(),
   });
   ui.title({ stars: totalStars(progress) });
   ui.show('title');
   document.body.dataset.flow = 'title';
   safe(() => ow?.ui?.setLook?.({ accent: '#F4A835', panel: '#14131F', text: '#FFF1D6' }));
-  safe(() => ui.layout(ow?.ui?.reserved ?? null));
+  safe(() => ui.layout((ow && ow.ui && ow.ui.reserved) || null));
   safe(() => ow?.on?.('reserved', (a) => ui.layout(a)));
 
   function cycleGlasses() {
@@ -124,7 +142,7 @@ async function boot() {
     const owned = GLASSES.map((g, i) => (stars >= g.stars ? i : -1)).filter((i) => i >= 0);
     const at = owned.indexOf(progress.glasses);
     progress.glasses = owned[(at + 1) % owned.length] ?? 0;
-    saveProgress(ow, progress);
+    persist();
     audio.play('click');
   }
 
@@ -138,7 +156,7 @@ async function boot() {
     // Alone with nothing played yet: straight into Night 1. Anyone else lands in the lobby (or watches a night under way).
     if (AUTO_TO === 'lobby') return;
     const want = AUTO ? Number(q.get('night')) || ENV_NIGHT || 1 : ENV_NIGHT || 1;
-    if (totalStars(progress) === 0 || AUTO) {
+    if ((totalStars(progress) === 0 && !import.meta.env?.VITE_LOBBY) || AUTO) {
       if (session) quick(want);
       else wantQuick = want;
     }
@@ -149,10 +167,12 @@ async function boot() {
   }
 
   function resultsAction(what) {
-    if (!room.isHost || session.phase !== 'results') return;
+    if (!session || !room.isHost || session.phase !== 'results') return;
     const r = session.result();
     if (!r) return;
-    if (what === 'next') session.next(Math.min(NIGHT_COUNT, r.night + 1));
+    // Next only after a night with cheese home (it's what opens the next one); otherwise it means Again, as the big button says.
+    if (what === 'next' && r.home > 0 && r.night < NIGHT_COUNT) session.next(r.night + 1);
+    else if (what === 'next') session.next(r.night);
     else if (what === 'again') session.next(r.night);
     else session.toMap();
   }
@@ -236,7 +256,7 @@ async function boot() {
   // ------------------------------------------------------------ pause (alone), room closed
   let pausedBand = false;
   function pause() {
-    if (!session.alone() || session.phase === 'results' || session.phase === 'lobby') return;
+    if (!session || !session.alone() || session.phase === 'results' || session.phase === 'lobby') return;
     if (!session.setPaused(true)) return;
     pausedBand = true;
     audio.music('quiet');
@@ -279,10 +299,14 @@ async function boot() {
         {
           label: msg[1],
           big: true,
-          fn: async () => {
+          fn: () => {
             ui.band(null);
-            room = await join();
-            makeSession();
+            join()
+              .then((r) => {
+                room = r;
+                makeSession();
+              })
+              .catch(showError);
           },
         },
       ],
@@ -296,14 +320,19 @@ async function boot() {
     nightStats.catWoke = false;
     nightStats.myRings = [];
   }
-  const award = (id) => safe(() => ow?.badges?.award?.(id)?.catch?.(() => {}));
+  const awarded = new Set();
+  const award = (id) => {
+    if (awarded.has(id)) return;
+    awarded.add(id);
+    safe(() => ow?.badges?.award?.(id)?.catch?.(() => {}));
+  };
   function onResults() {
     const r = session.result();
     if (!r || !room.isParticipant?.(room.me.id)) return;
     const mine = r.rows.find((x) => x.me);
     const before = totalStars(progress);
-    const got = recordNight(progress, r, nightStats.squeaks);
-    saveProgress(ow, progress);
+    recordNight(progress, r, nightStats.squeaks);
+    persist();
     if (r.home > 0 && mine?.tail) award('still-got-it');
     if (r.stars.all && nightStats.squeaks <= 5) award('silent-run');
     if (r.night === 5 && r.home > 0 && !nightStats.catWoke) award('let-sleeping-cats-lie');
@@ -311,7 +340,6 @@ async function boot() {
     if (progress.stars.every((s) => s > 0)) award('farmhouse');
     if (r.stars.all) safe(() => ow?.leaderboards?.submit?.(`night-${r.night}`, Math.round(r.time * 10) / 10, { lowerIsBetter: true })?.catch?.(() => {}));
     if (totalStars(progress) > before) safe(() => ow?.leaderboards?.submit?.('stars', totalStars(progress))?.catch?.(() => {}));
-    void got;
   }
 
   // ------------------------------------------------------------ sound and juice from what happened
@@ -462,8 +490,7 @@ async function boot() {
     const me = vm.mice.find((m) => m.me);
     const timeLeft = d ? Math.max(0, d.dawn - vm.now) : 0;
     const frac = d ? (vm.now - d.t0) / Math.max(1, d.dawn - d.t0) : 0;
-    const css = getComputedStyle(document.documentElement);
-    const inset = { side: 34, top: parseFloat(css.getPropertyValue('--top-l')) + 40, bottom: parseFloat(css.getPropertyValue('--bot')) + 70 };
+    const inset = { side: 34, top: ui.insets.top + 40, bottom: ui.insets.bot + 70 };
     const tags = [];
     const arrows = [];
     for (const m of vm.mice) {
@@ -472,7 +499,7 @@ async function boot() {
       if (proj.on) tags.push({ x: proj.x, y: proj.y, text: m.name || 'Mouse', color: SEAT_CSS[m.seat] ?? '#fff' });
       else {
         const e = edgePoint(proj.x, proj.y, inset);
-        arrows.push({ ...e, color: SEAT_CSS[m.seat], kind: 'friend', sym: SEAT_SYMBOLS[m.seat] });
+        arrows.push({ ...e, color: SEAT_CSS[m.seat], kind: 'friend', seat: m.seat });
       }
     }
     // The goal, pointed to when it's off screen: the cheese, then the hole.
@@ -496,7 +523,7 @@ async function boot() {
         view.project(goal.x, 0.3, goal.z, proj);
         if (!proj.on || proj.y < inset.top - 20 || proj.y > innerHeight - inset.bottom + 30) {
           const e = edgePoint(proj.x, proj.y, inset);
-          arrows.push({ ...e, color: goal.kind === 'hole' ? '#FF9A3C' : '#FFD23F', kind: goal.kind, sym: '' });
+          arrows.push({ ...e, color: goal.kind === 'hole' ? '#FF9A3C' : '#FFD23F', kind: goal.kind, seat: -1 });
         }
       }
     }
@@ -523,12 +550,12 @@ async function boot() {
       }
     }
     audio.danger(danger);
-    const note = !watching && room.spectators?.length ? `${room.spectators.map((p) => p.name).join(', ')} watching` : '';
+    const note = !watching && room?.spectators?.length ? `${room.spectators.map((p) => p.name).join(', ')} watching` : '';
     return { timeLeft, frac, items: d ? d.it : [], tags, arrows, out, rest, chase, watching, canJoin, hint: hints.current, note };
   }
 
   // Hints: once each, saved; again only for a player who seems stuck.
-  function hintTick(vm) {
+  function hintTick(vm, dt) {
     const me = vm.mice.find((m) => m.me);
     const d = vm.data;
     if (!me || !d || me.st === 'watch') return;
@@ -542,7 +569,7 @@ async function boot() {
     if (t > 2 && night === 4) hints.show('trap');
     if (t > 2 && (night === 5 || night === 9)) hints.show('cat');
     if (t > 2 && night === 7) hints.show('decoy');
-    hints.tick(1 / 60);
+    hints.tick(dt);
   }
 
   // ------------------------------------------------------------ the attract mode: three autopilot mice in the kitchen
@@ -563,9 +590,12 @@ async function boot() {
     const n = Math.max(1, Math.min(3, Number(q.get('mice')) || 3));
     const night = Math.max(1, Math.min(NIGHT_COUNT, Number(q.get('night')) || 1));
     const seed = Number(q.get('seed')) || 7;
-    simGame = { sim: createSim({ night, ids: ['m1', 'm2', 'm3'].slice(0, n), seed, skill: [0.95, 0.85, 0.8], solo: n === 1 }), phase: 'intro', t: 0, acc: 0 };
+    const careless = q.get('careless') ? [false, true, true] : false;
+    view.zoom = Math.max(0.5, Math.min(3, Number(q.get('zoom')) || 1));
+    simGame = { sim: createSim({ night, ids: ['m1', 'm2', 'm3'].slice(0, n), seed, skill: [0.95, 0.85, 0.8], careless, solo: n === 1 }), phase: 'intro', t: 0, acc: 0 };
     const [hx, hz] = holeMouth(simGame.sim.world);
-    simGame.sim.rings.push({ kind: 'midnight', x: hx, z: hz, t: 0, src: '' });
+    // ring0: the midnight ring already that far along (a capture that opens mid-sweep).
+    simGame.sim.rings.push({ kind: 'midnight', x: hx, z: hz, t: -Math.min(2, Math.max(0, Number(q.get('ring0')) || 0)), src: '' });
     screen = 'sim';
     audio.start();
     view.mode = 'intro';
@@ -574,7 +604,18 @@ async function boot() {
     ui.intro(simGame.sim.world.night);
     if (q.get('skipintro')) {
       simGame.phase = 'round';
+      view.mode = q.get('cam') === 'wide' ? 'attract' : 'follow';
       ui.show('hud');
+      audio.music('play');
+    }
+    // wait=1: hold the first frame until a capture says go (a 'tbm-go' event on window).
+    if (q.get('wait')) {
+      simGame.held = simGame.phase;
+      simGame.phase = 'hold';
+      addEventListener('tbm-go', () => {
+        simGame.phase = simGame.held;
+        simGame.t = 0;
+      }, { once: true });
     }
   }
 
@@ -583,7 +624,6 @@ async function boot() {
   let lobbyT = 0;
   let lobbyRings = [];
   let nextLobbyRing = 0;
-  let introShown = '';
   let autoBrain = null;
   let morningT = 0;
   let resultsShown = '';
@@ -608,8 +648,10 @@ async function boot() {
   );
   view.setQuality(settings().quality ?? 'medium');
 
-  function frame(nowMs) {
+  function frame() {
     requestAnimationFrame(frame);
+    // performance.now(), not the frame's timestamp: the same clock everywhere (a capture's virtual time moves only this one).
+    const nowMs = performance.now();
     if (document.hidden) {
       last = nowMs;
       return;
@@ -686,7 +728,6 @@ async function boot() {
         lobbyRings = [];
         lobbyT = 0;
         nextLobbyRing = 0;
-        introShown = '';
         resultsShown = '';
         if (pausedBand) {
           pausedBand = false;
@@ -737,7 +778,7 @@ async function boot() {
         view.mode = 'follow';
         audio.music('play');
       }
-      hintTick(s);
+      hintTick(s, dt);
       const carryingNow = s.data && carrying(s.data, room.me.id) >= 0;
       if (room.isParticipant(room.me.id) && s.me.st !== 'out') {
         const buttons = [{ id: 'squeak', label: 'Squeak', key: ' ' }];
@@ -794,10 +835,25 @@ async function boot() {
       .catch(() => {});
   }
 
+  // focus=<n>: the camera follows that mouse (it is 'you' on the HUD).
+  const simFocus = Math.max(0, Math.min(2, Number(q.get('focus')) || 0));
+  function simView(sim) {
+    const vm = viewFromSim(sim);
+    if (vm.mice[simFocus]) {
+      vm.mice.forEach((m, i) => (m.me = i === simFocus));
+      vm.focus = vm.mice[simFocus];
+    }
+    return vm;
+  }
+
   function simTick(dt) {
     const g = simGame;
     const sim = g.sim;
     g.t += dt;
+    if (g.phase === 'hold') {
+      view.snapCamera();
+      return view.render(simView(sim), 0);
+    }
     if (g.phase === 'intro') {
       sim.now += 0; // the world waits while the camera drops in
       if (g.t > 2.5) {
@@ -807,7 +863,7 @@ async function boot() {
         audio.music('play');
       }
       ui.lightIntro(Math.min(170, 10 + g.t * 90));
-      const vm = viewFromSim(sim);
+      const vm = simView(sim);
       vm.now = g.t;
       view.render(vm, dt);
       if (g.t < dt * 2) audio.play('dong');
@@ -829,7 +885,7 @@ async function boot() {
         audio.play('morning');
         audio.music('off');
       }
-      const vm = viewFromSim(sim);
+      const vm = simView(sim);
       view.mode = q.get('cam') === 'wide' ? 'attract' : 'follow';
       ui.hud(hudState(vm, { watching: false, canJoin: false }));
       view.render(vm, dt);
@@ -838,8 +894,9 @@ async function boot() {
     if (g.phase === 'morning' && g.t > 2) {
       g.phase = 'results';
       view.mode = 'burrow';
+      ui.show('');
     }
-    const vm = viewFromSim(sim);
+    const vm = simView(sim);
     vm.burrow = { wedges: sim.data.it.filter((i) => i.home && i.k === 'w').length, wheel: sim.data.it.some((i) => i.home && i.k === 'W'), mice: sim.mice.map((m, i) => ({ seat: i, tail: sim.data.mice[m.id].tail, g: [0, 2, 4][i] })) };
     view.render(vm, dt);
   }
@@ -868,7 +925,4 @@ async function boot() {
       else if (e.type === 'snap') audio.play('snap');
     }
   }
-
-  void fmtTime;
-  void NIGHTS;
 }

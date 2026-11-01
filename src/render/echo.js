@@ -15,7 +15,11 @@ export const PALETTE = {
 };
 export const SEAT_COLORS = [0x7ea2ff, 0xff7fa8, 0x6fe0b0];
 export const SEAT_CSS = ['#7EA2FF', '#FF7FA8', '#6FE0B0'];
-export const SEAT_SYMBOLS = ['●', '▲', '■'];
+// Each seat's shape (circle, triangle, square), drawn, so it looks the same on every device: SVG paths centred on 0, 0 at
+// radius 1.
+export const SEAT_SHAPES = ['M1 0A1 1 0 1 1-1 0A1 1 0 1 1 1 0Z', 'M0-1.05L1.05 0.8L-1.05 0.8Z', 'M-0.85-0.85H0.85V0.85H-0.85Z'];
+export const seatSvg = (seat, size = 14, color = SEAT_CSS[seat] ?? '#fff') =>
+  `<svg class="shape" viewBox="-1.2 -1.2 2.4 2.4" width="${size}" height="${size}" style="vertical-align:-0.1em"><path d="${SEAT_SHAPES[seat] ?? SEAT_SHAPES[0]}" fill="${color}"/></svg>`;
 
 const MAX_GLOWS = 10;
 
@@ -141,7 +145,8 @@ export function patchEcho(material, { fill = 1, front = 1, rim = 0, seams = null
         }`,
       );
   };
-  material.customProgramCacheKey = () => `echo-${fill}-${front}-${rim}-${seams ? 's' : ''}`;
+  // fill, front and rim are uniforms (each material keeps its own), so only the seams change the shader's text: fewer programs.
+  material.customProgramCacheKey = () => `echo${seams ? '-s' : ''}`;
   return material;
 }
 
