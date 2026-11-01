@@ -136,10 +136,15 @@ export function createBurrow() {
   ];
   const pose = { x: 0, y: 0, z: 0, a: 0, speed: 0, st: 'hole', tail: 1, g: 0, carry: '', stun: 0, charge: 0, me: false, away: false };
   let t = 0;
+  // A cheer: the mice hop, one after another (a medal, a level, an unlock).
+  let cheerT = -9;
 
   return {
     scene,
     camera,
+    cheer() {
+      cheerT = t;
+    },
     update(vm, dt, reduced) {
       t += dt;
       const b = vm.burrow ?? { wedges: 3, wheel: true, mice: [{ seat: 0, tail: 1, g: 0 }, { seat: 1, tail: 0, g: 2 }, { seat: 2, tail: 1, g: 4 }] };
@@ -155,6 +160,8 @@ export function createBurrow() {
         pose.z = z;
         pose.a = a;
         pose.y = i === 0 ? top : y;
+        const cu = (t - cheerT - i * 0.09) / 0.55;
+        if (!reduced && cu > 0 && cu < 1) pose.y += Math.sin(cu * Math.PI) * 0.55;
         pose.tail = info.tail;
         pose.g = info.g ?? 0;
         pose.look = info.look ?? { g: info.g ?? 0, h: 0, f: 0, t: 0 };

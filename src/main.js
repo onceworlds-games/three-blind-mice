@@ -136,7 +136,10 @@ async function boot() {
   let screen = 'title';
   let shownPhase = '';
   const ui = createUI({
-    sfx: (n, o) => audio.play(n, o),
+    sfx: (n, o) => {
+      audio.play(n, o);
+      if ((n === 'medal' && o?.n) || n === 'levelup' || n === 'unlock') view.cheer();
+    },
     reduced,
     onPlay: () => play(),
     onRaid: () => play(true),
@@ -199,6 +202,7 @@ async function boot() {
         raidBoard.day = day;
         raidBoard.top = raidTop(list, day, room?.me?.id ?? '');
         refreshTitle();
+        if (session?.phase === 'results' && session.result()?.day === day) ui.raidBoard(raidBoard.top);
       })
       .catch(() => {});
     Promise.resolve(safe(() => ow.data.game.get('raiders')))
@@ -785,7 +789,9 @@ async function boot() {
     const seed = Number(q.get('seed')) || 7;
     const careless = q.get('careless') ? [false, true, true] : false;
     view.zoom = Math.max(0.5, Math.min(3, Number(q.get('zoom')) || 1));
-    simGame = { sim: createSim({ night, ids: ['m1', 'm2', 'm3'].slice(0, n), seed, skill: [0.95, 0.85, 0.8], careless, solo: n === 1 }), phase: 'intro', t: 0, acc: 0 };
+    // day=YYYYMMDD: that day's Daily Raid instead.
+    const raidNight = FAKE_DAY ? dailyNight(FAKE_DAY) : null;
+    simGame = { sim: createSim({ night: raidNight ?? night, ids: ['m1', 'm2', 'm3'].slice(0, n), seed, skill: [0.95, 0.85, 0.8], careless, solo: n === 1 }), phase: 'intro', t: 0, acc: 0 };
     const [hx, hz] = holeMouth(simGame.sim.world);
     // ring0: the midnight ring already that far along (a capture that opens mid-sweep).
     simGame.sim.rings.push({ kind: 'midnight', x: hx, z: hz, t: -Math.min(2, Math.max(0, Number(q.get('ring0')) || 0)), src: '' });
@@ -1029,7 +1035,7 @@ async function boot() {
         audio.music('menu');
         if (lastRec?.roundId !== s.roundId) onResults();
         const mineRec = lastRec?.roundId === s.roundId ? lastRec : null;
-        ui.results({ ...r, nightName: s.world.night.name, rec: mineRec?.rec ?? null, level: mineRec?.level ?? null, unlocked: mineRec?.unlocked ?? [], goals: mineRec?.goals ?? [], isHost: room.isHost, next: r.night < NIGHT_COUNT, hostName: room.players.get(room.host)?.name ?? 'the host' });
+        ui.results({ ...r, board: r.day === today() ? raidBoard.top : null, nightName: s.world.night.name, rec: mineRec?.rec ?? null, level: mineRec?.level ?? null, unlocked: mineRec?.unlocked ?? [], goals: mineRec?.goals ?? [], isHost: room.isHost, next: r.night < NIGHT_COUNT, hostName: room.players.get(room.host)?.name ?? 'the host' });
         if (r.score?.medal === 3) view.addTrauma(0.25);
       }
       if (r) vm = { ...s, burrow: { wedges: s.data.it.filter((i) => i.home && i.k === 'w').length, wheel: s.data.it.some((i) => i.home && i.k === 'W'), mice: r.rows.map((row) => ({ seat: row.seat, tail: row.tail, g: row.look?.g ?? 0, look: row.look })) } };

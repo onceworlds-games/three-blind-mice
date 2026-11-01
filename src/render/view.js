@@ -288,6 +288,7 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
   };
   v.burst = (x, z, n = 60) => fx.confetti(x, 0.5, z, n);
   // A crumb into a mouth: a puff of crumbs and a glint, bigger with the chain.
+  v.cheer = () => burrow.cheer();
   v.crumbPop = (x, z, mult = 1, color = 0xffd23f) => {
     if (v.reduced) return;
     fx.crumbs(x, 0.12, z, 4 + mult * 2, color);

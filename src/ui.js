@@ -582,6 +582,11 @@ export function createUI(h) {
   rXp.innerHTML = `${headSvg(30)}<span class="lv slab"></span><span class="bar"><i></i></span><span class="gain slab"></span>`;
   const rUnlock = el('div', 'unlock', sheet);
   const rGoals = el('div', 'rgoals', sheet);
+  const rBoard = el('div', 'rboard', sheet);
+  // Today's raid board under a raid's results (filled again when a fresh read arrives).
+  ui.raidBoard = (top) => {
+    rBoard.innerHTML = top?.length ? `<div class="gh"><b class="slab">Today's raid</b></div>${boardRows(top.slice(0, 5))}` : '';
+  };
   const rRows = el('div', 'rows solid', sheet);
   const rBtns = el('div', 'btns', res);
   const timers = [];
@@ -614,6 +619,7 @@ export function createUI(h) {
     rMedal.innerHTML = '';
     rUnlock.innerHTML = '';
     rGoals.innerHTML = '';
+    ui.raidBoard(r.day ? r.board : null);
     // The lines, one by one.
     let at = 300;
     let running = 0;

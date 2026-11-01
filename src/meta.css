@@ -990,6 +990,35 @@
 #results .rgoals.on {
   opacity: 1;
 }
+#results .rboard {
+  margin-top: 8px;
+  font-size: 15px;
+}
+#results .rboard .gh {
+  font-size: 18px;
+  color: var(--cheese);
+}
+#results .rboard div:not(.gh) {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255, 241, 214, 0.08);
+}
+#results .rboard i {
+  font-style: normal;
+  width: 18px;
+  color: var(--amber);
+  font-weight: 700;
+}
+#results .rboard span {
+  flex: 1;
+}
+#results .rboard b {
+  color: var(--cheese);
+}
+#results .rboard .me {
+  color: var(--cheese);
+}
 #results .sheet .rows {
   position: static;
   margin-top: 10px;
