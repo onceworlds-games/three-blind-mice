@@ -431,21 +431,25 @@ Synthesized Web Audio; sound is the game.
 All store art is rendered by the game itself (`?poster=<name>`, hand-staged scenes through the real view and shader, at
 high quality) and saved into `store/` by the posters tool.
 
-- **Cover** (`thumb-1`): the kitchen mid-squeak, a huge amber ring sweeping across table legs and jars, three mice in
-  sunglasses (one carrying a glowing wedge) and the wife's lantern pool coming in. **Three Blind Mice** once, big.
-- **Action** (`thumb-2`): a mouse in her light, the knife's shadow and red outline right over it, the blade coming down.
-  No text.
-- **Win** (`thumb-3`): the burrow, three mice on the cheese, one with a bandaged stub, **Morning** and three stars.
-- **Multi** (`thumb-4`): three mice, three rings (solid, dashed, dotted) overlapping in their colours, the wheel between
-  them, names in their seat shapes.
-- **Icon:** a mouse face with round sunglasses on midnight, an amber ring behind.
-- **Badges:** each a bold symbol (a ring, a wedge, a tail, a knife, a moon, a wheel, a sleeping cat, three mice, the
-  farmhouse) on a coloured disc from the palette.
-- **Trailer (`store/trailer.mp4`, 21.7 s):** real gameplay from the in-page autopilot night (no staging), cut from five
-  takes: frame 0 is the midnight ring mid-sweep drawing the Kitchen from the hole; three mice squeak the Dining Room into
-  view in their colours; her lantern finds a mouse in the Pantry; in the Larder the knife comes down, a tail pops and the
-  blade sticks in the floor; three mice roll the wheel home; the last wedge goes home, Morning, the burrow; the name over the
-  title's attract play for the last 2.8 s.
+- **Cover** (`thumb-1`): the kitchen mid-squeak, a big ring sweeping across the table and a chair drawn in light,
+  three mice in sunglasses (one running the wedge home), crumbs glinting, the wife's slippers coming in at the corner.
+  **Three Blind Mice** once, big, and "Squeak to see."
+- **Action** (`thumb-2`): a close shave in the Hallway: the knife just landed a whisker behind a mouse running the cheese
+  home, splinters flying, her slippers and lantern above. No text.
+- **Win** (`thumb-3`): the burrow by candlelight, three mice in their earned hats round the wedges and the wheel,
+  **Morning** and three stars.
+- **Multi** (`thumb-4`): three named mice rolling the wheel home, their rings overlapping in their colours (solid,
+  dashed, dotted), "Bring two friends".
+- **Icon:** the game's own mouse model in its round dark glasses with a wedge, a ring of light behind it, on midnight.
+- **Badges (21):** each a medallion in the palette with the game's own models posed on it (a mouse in the outfit the
+  badge stands for, the wedge, the wheel, Butter curled asleep, the knife) and a bold symbol around it (rings, crumbs,
+  medals, paw prints, checks, a flame, the level number).
+- **Trailer (`store/trailer.mp4`, 30.1 s):** real gameplay from the in-page autopilot (seeded nights, no staging),
+  cut from eight takes: frame 0 is the midnight ring drawing the whole Kitchen in light; mice chain a crumb trail under
+  their rings; her lantern finds two mice in the Hallway ("!"); Butter stalks and pounces in the Dining Room; three mice
+  roll the wheel into the hole and the score jumps; her knife comes down by the hole; Morning, and the results count up
+  to a silver medal, a level and a new beanie; the wardrobe tries on a top hat, a wizard's hat, a crown and star
+  glasses; the name over the title for the last 3 s. Captured with virtual time, so every frame is smooth.
 
 ## Originality check
 
@@ -472,11 +476,14 @@ screen moves are CSS transitions. `"dir": "dist"`, `base: './'`.
   `main.js`.
 - **Shaders:** the echo patch is one program per base material (fill, front and rim are per-material uniforms), about 15
   programs in all. A new room compiles with `compileAsync` (off the main thread where the browser can) and draws once
-  ready; hunters' lights go dark rather than hidden, since a light that comes and goes recompiles every shader. A GPU drawn
-  in software (SwiftShader, llvmpipe) always plays on low: no bloom, no shadows.
+  ready (the screen is cleared meanwhile); hunters' lights go dark rather than hidden, since a light that comes and goes
+  recompiles every shader. A GPU drawn in software (SwiftShader, llvmpipe) always plays on low: no bloom, no shadows.
+- **Every frame draws.** Hit-stop redraws the held pose instead of skipping the frame: a page that goes frames without a
+  WebGL draw stalled a virtual-time capture's compositor (rAF stopped firing) at every close shave and every Morning.
 - **Local-only switches** (ignored on onceworlds.com): `?autoplay=1` (the autopilot plays your mouse); with `mice=1-3`,
-  `night`, `seed`, `careless=1`, `focus=<n>`, `zoom=<x>`, `skipintro=1`, `cam=wide`, `wait=1` and `ring0=<s>` it runs a
-  whole night in the page with every mouse on autopilot (the trailer); `?poster=<name>` renders store art. Build-time `VITE_NIGHT`,
+  `night`, `seed`, `careless=1`, `focus=<n>`, `zoom=<x>`, `skipintro=1`, `cam=wide`, `wait=1`, `ring0=<s>` and
+  `day=<YYYYMMDD>` (that day's raid) it runs a whole night in the page with every mouse on autopilot (the trailer);
+  `autoplay-to=lobby|title`, `dress=1` and `try=<kind>:<id>` open those screens; `?poster=<name>` renders store art. Build-time `VITE_NIGHT`,
   `VITE_LOBBY` and `VITE_AUTOPLAY` exist only for local screenshots.
 
 ## Risks
