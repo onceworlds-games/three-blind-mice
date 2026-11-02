@@ -115,17 +115,30 @@ test('the score: cheese, crumbs, style bonuses only when something came home, me
   assert.ok(!scoreNight(d1, w1, 30).lines.some((l) => l.id === 'quiet'));
 });
 
-test('medals: a mouse that knows the night gets silver or gold, a careless one rarely gold', () => {
+test('medals: bronze for cheese home, silver for a careful mouse, gold a stretch the autopilot misses', () => {
   let good = 0;
   let careless = 0;
+  let bronze = 0;
   for (const id of [2, 4, 7, 9]) {
     for (const seed of [1, 2]) {
       good += createSim({ night: id, seed, skill: 0.95 }).run(400).score().medal >= 2 ? 1 : 0;
-      careless += createSim({ night: id, seed, skill: 0.5, careless: true }).run(400).score().medal === 3 ? 1 : 0;
+      const c = createSim({ night: id, seed, skill: 0.5, careless: true }).run(400).score().medal;
+      careless += c === 3 ? 1 : 0;
+      bronze += c >= 1 ? 1 : 0;
     }
   }
   assert.ok(good >= 6, `silver or better: ${good}/8`);
-  assert.ok(careless <= 2, `careless golds: ${careless}/8`);
+  assert.ok(careless === 0, `careless golds: ${careless}/8`);
+  assert.ok(bronze >= 7, `careless bronze or better: ${bronze}/8`);
+  // Night 1's autopilot gets every easy bonus but half the crumbs: silver, well short of gold.
+  for (const seed of [1, 2, 3]) {
+    const s = createSim({ night: 1, seed, skill: 0.95 }).run(400).score();
+    assert.equal(s.medal, 2, `night 1 seed ${seed}: ${s.total} of ${s.medals}`);
+    assert.ok(s.medals[2] - s.total >= 400, `night 1 gold is a stretch: ${s.total} vs ${s.medals[2]}`);
+  }
+  // Bronze: one wedge home on night 1 is enough.
+  const w = buildWorld(1);
+  assert.ok(medalsFor(w)[0] <= SCORE.wedge);
 });
 
 test('the Daily Raid: one remix per day, the same for everyone, cheese moved, still clearable', () => {

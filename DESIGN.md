@@ -92,9 +92,11 @@ light and over creaky boards. That's the tension: the score lives where the dang
 The score at dawn: cheese home (wedge 500, golden wedge 1500, wheel 1500) + every mouse's crumbs, and, only if something
 came home, bonuses: **Every tail** 600, **Unseen** 800 (nobody spotted), **Quiet feet** 400 (no floor noise, on nights that
 have creaky floor), **Close shaves** 100 each (up to 8), **Every crumb** 500, **Quick paws** up to 1000 (full at the night's
-par time, none at twice par). Medals per night: bronze = all the cheese's worth; silver = cheese + 30% of the best chain
-score + 45% of the bonuses; gold = cheese + 60% + 80%. Bot sims (`calib.mjs`): a careful autopilot mostly lands silver,
-gold needs chains, no spotting and speed.
+par time, none at twice par). Medals per night: bronze = 60% of the cheese's worth (one wedge home on night 1); silver =
+the cheese + 35% of the best chain score + 60% of the bonuses; gold = 90% of a perfect night (all cheese, every crumb in
+×5 chains, every bonus), so it takes every crumb, nobody spotted and par time, or close shaves to make up the gap. Bot sims
+(`test/score.test.mjs`): the careful autopilot lands silver on nearly every night (night 1: 3300 against gold's 3850) and
+gold only on night 12; a careless one always gets bronze or silver, never gold.
 
 ### Stars (per night)
 

@@ -36,13 +36,14 @@ export function noisy(world) {
 // Every style bonus this night can give (not counting close shaves).
 export const bonusMax = (world) => SCORE.tails + SCORE.unseen + (noisy(world) ? SCORE.quiet : 0) + SCORE.speed + (world.crumbs.length ? SCORE.sweep : 0);
 
-// What a medal takes on this night: [bronze, silver, gold]. Bronze: the cheese. Gold: most crumbs in chains and most of
-// the style bonuses, about what a mouse that knows the night by heart scores.
+// What a medal takes on this night: [bronze, silver, gold]. Bronze: most of the cheese home. Silver: all of it, some
+// chains and most of the easy bonuses (a careful autopilot lands here). Gold: nine tenths of a perfect night (every crumb
+// in long chains, every bonus at par), or close shaves to make up the gap: a stretch even for a mouse that knows the night.
 export function medalsFor(world) {
   const cheese = world.items.reduce((s, i) => s + itemPts(i), 0);
   const cm = crumbMax(world.crumbs.length);
   const b = bonusMax(world);
-  return [cheese, round50(cheese + cm * 0.3 + b * 0.45), round50(cheese + cm * 0.6 + b * 0.8)];
+  return [round50(cheese * 0.6), round50(cheese + cm * 0.35 + b * 0.6), round50((cheese + cm + b) * 0.9)];
 }
 
 export const medalOf = (total, m) => (total >= m[2] ? 3 : total >= m[1] ? 2 : total >= m[0] ? 1 : 0);
