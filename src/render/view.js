@@ -510,7 +510,7 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
       g[0] = it.x;
       g[1] = it.z;
       g[2] = it.k === 'W' ? 2.2 : 1.5;
-      g[3] = 0.2 + 0.6 * Math.min(1, model.ping / 2);
+      g[3] = 0.15 + 0.45 * Math.min(1, model.ping / 2);
     });
     setGlows(glows, n);
   }
@@ -762,11 +762,11 @@ export function createView(canvas, { quality = 'medium', poster = false } = {}) 
         model.body.rotation.z = carried && !v.reduced ? Math.sin(t * 13) * 0.08 : 0;
       }
       if (model.gold && !v.reduced && Math.random() < dt * 6) fx.glint(it.x + (Math.random() - 0.5) * 0.5, 0.2 + Math.random() * 0.4, it.z + (Math.random() - 0.5) * 0.5, 0xffe08a, 0.25);
-      const glow = (model.gold ? 0.3 : 0.1) + Math.min(1, model.ping / 1.5) * 0.28 + (carried ? 0.1 : 0);
+      const glow = (model.gold ? 0.3 : 0.08) + Math.min(1, model.ping / 1.5) * 0.22 + (carried ? 0.06 : 0);
       model.mat.emissiveIntensity = glow;
       if (model.mat2) model.mat2.emissiveIntensity = glow;
       model.glow.position.set(it.x, 0.03, it.z);
-      model.glow.material.opacity = 0.25 + Math.min(1, model.ping / 2) * 0.55;
+      model.glow.material.opacity = 0.1 + Math.min(1, model.ping / 2) * 0.32;
       model.glow.scale.setScalar(1 + Math.min(1, model.ping / 3) * 0.6);
     });
     v.traps.forEach((m, i) => {

@@ -40,6 +40,11 @@ export const echo = {
   uRimScale: { value: 1 },
   // The cut-away: the mouse you're watching (xyz) and the radius (w) cleared round the line from the camera to it.
   uCut: { value: new THREE.Vector4(0, 0, 0, 0) },
+  // The ink line round the mice, the cat and the cheese: its width per unit of distance from the camera (so the same on
+  // screen at any zoom).
+  uInk: { value: 0.0021 },
+  // What the characters write to alpha so the outline pass leaves them to their own ink and rim (1 where nothing reads it).
+  uMark: { value: 1 },
 };
 
 // Tint index per ring: 0 cream, 1-3 the seats, 4 moon (masking sounds), 5 lantern (the hunters' steps).
@@ -124,14 +129,21 @@ void echoCut(vec3 wp) {
 `;
 
 // Surfaces: lit amber where echoes pass (their own colour, warmed), the ring's edge in its colour, everything else lit by
-// real lights. rim: a soft edge light for the characters. cut: cleared out of the way of your mouse.
-export function patchEcho(material, { fill = 1, front = 1, rim = 0, cut = true, glow = null } = {}) {
+// real lights. rim: a soft edge light for the characters. cut: cleared out of the way of your mouse. actor: the colour of
+// a character's rim (the mice, the cat, the cheese): it keeps its own colour in any light, a little lit even in the dark,
+// brighter where echoes pass but never washed out to cream, with a rim of that colour round its silhouette.
+export function patchEcho(material, { fill = 1, front = 1, rim = 0, cut = true, glow = null, actor = null } = {}) {
   material.userData.echoGlow = glow ?? { value: 0 };
   material.userData.echoFill = { value: fill };
   material.userData.echoFront = { value: front };
   material.userData.echoRim = { value: rim };
+  material.userData.echoRimColor = { value: new THREE.Color(actor ?? PALETTE.cream) };
   material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, echo, { uFillScale: material.userData.echoFill, uFrontScale: material.userData.echoFront, uRim: material.userData.echoRim, uSelfGlow: material.userData.echoGlow });
+    Object.assign(shader.uniforms, echo, { uFillScale: material.userData.echoFill, uFrontScale: material.userData.echoFront, uRim: material.userData.echoRim, uSelfGlow: material.userData.echoGlow, uRimColor: material.userData.echoRimColor });
+    if (actor != null) {
+      shader.defines = { ...shader.defines, ECHO_ACTOR: 1 };
+      if (!material.transparent) shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', '#include <opaque_fragment>\ngl_FragColor.a = uMark;');
+    }
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vEchoPos;\nvarying vec3 vEchoN;')
       .replace(
@@ -145,7 +157,7 @@ export function patchEcho(material, { fill = 1, front = 1, rim = 0, cut = true, 
         vEchoN = normalize(mat3(modelMatrix) * objectNormal);`,
       );
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying vec3 vEchoPos;\nvarying vec3 vEchoN;\nuniform float uFillScale;\nuniform float uFrontScale;\nuniform float uRim;\nuniform float uSelfGlow;\nuniform float uFillGain;\nuniform float uRimScale;\n${GLSL_ECHO}\n${cut ? GLSL_CUT : ''}`)
+      .replace('#include <common>', `#include <common>\nvarying vec3 vEchoPos;\nvarying vec3 vEchoN;\nuniform float uFillScale;\nuniform float uFrontScale;\nuniform float uRim;\nuniform float uSelfGlow;\nuniform float uFillGain;\nuniform float uRimScale;\nuniform vec3 uRimColor;\nuniform float uMark;\n${GLSL_ECHO}\n${cut ? GLSL_CUT : ''}`)
       .replace('void main() {', `void main() {\n${cut ? 'echoCut(vEchoPos);' : ''}`)
       .replace(
         '#include <emissivemap_fragment>',
@@ -154,19 +166,63 @@ export function patchEcho(material, { fill = 1, front = 1, rim = 0, cut = true, 
           float rv; float fr; vec3 tint; vec2 mem;
           echoAt(vEchoPos.xz, rv, fr, tint, mem);
           vec3 alb = diffuseColor.rgb;
+          #ifdef ECHO_ACTOR
+          float lit = min(0.8, max(rv, mem.r * mem.r * 0.16));
+          totalEmissiveRadiance += alb * (0.14 + lit * 0.62) * uFillGain * uFillScale + tint * fr * 0.1 * uFrontScale;
+          {
+            vec3 vd = normalize(cameraPosition - vEchoPos);
+            float f = pow(1.0 - abs(dot(vd, normalize(vEchoN))), 2.0);
+            totalEmissiveRadiance += uRimColor * f * uRim * uRimScale * (0.9 + 0.5 * min(rv, 1.0));
+          }
+          #else
           float lit = max(rv, mem.r * mem.r * 0.16);
           totalEmissiveRadiance += (alb * 0.85 + 0.03) * uAmber * lit * uFillGain * uFillScale + tint * fr * 0.42 * uFrontScale;
-          totalEmissiveRadiance += alb * uSelfGlow;
           if (uRim > 0.0) {
             vec3 vd = normalize(cameraPosition - vEchoPos);
             float f = pow(1.0 - abs(dot(vd, normalize(vEchoN))), 2.4);
             totalEmissiveRadiance += uCream * f * uRim * uRimScale * (0.35 + rv);
           }
+          #endif
+          totalEmissiveRadiance += alb * uSelfGlow;
         }`,
       );
   };
-  material.customProgramCacheKey = () => `echo${cut ? '-c' : ''}`;
+  material.customProgramCacheKey = () => `echo${cut ? '-c' : ''}${actor != null ? '-a' : ''}`;
   return material;
+}
+
+// The ink line: a shell just outside the mesh, its back faces in a dark ink, the same width on screen at any distance.
+// Characters wear it so they read against bright floors as well as dark ones (their rim does the dark ones).
+const inkMats = new Map();
+export function inkMaterial(color = 0x07060b) {
+  if (inkMats.has(color)) return inkMats.get(color);
+  const m = new THREE.MeshBasicMaterial({ color, side: THREE.BackSide });
+  m.onBeforeCompile = (shader) => {
+    shader.uniforms.uInk = echo.uInk;
+    shader.uniforms.uMark = echo.uMark;
+    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uMark;').replace('#include <opaque_fragment>', '#include <opaque_fragment>\ngl_FragColor.a = uMark;');
+    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nuniform float uInk;').replace(
+      '#include <project_vertex>',
+      `vec4 inkP = modelMatrix * vec4(transformed, 1.0);
+      vec3 inkN = normalize(transpose(inverse(mat3(modelMatrix))) * normal);
+      inkP.xyz += inkN * uInk * distance(cameraPosition, inkP.xyz);
+      vec4 mvPosition = viewMatrix * inkP;
+      gl_Position = projectionMatrix * mvPosition;`,
+    );
+  };
+  m.customProgramCacheKey = () => 'ink';
+  inkMats.set(color, m);
+  return m;
+}
+
+// Give a mesh its ink line (a child sharing its geometry). Returns the mesh.
+export function ink(mesh, color) {
+  const shell = new THREE.Mesh(mesh.geometry, inkMaterial(color));
+  shell.castShadow = false;
+  shell.receiveShadow = false;
+  shell.userData.ink = true;
+  mesh.add(shell);
+  return mesh;
 }
 
 // ---------------------------------------------------------------- the outline pass
@@ -222,7 +278,7 @@ export const EdgeShader = {
       float zr = dist(vUv + vec2(o.x, 0.0), rr);
       float zu = dist(vUv + vec2(0.0, o.y), ru);
       float zd = dist(vUv - vec2(0.0, o.y), rd);
-      if (min(min(r0, rl), min(min(rr, ru), rd)) >= 0.99999) { gl_FragColor = col; return; }
+      if (min(min(r0, rl), min(min(rr, ru), rd)) >= 0.99999) { gl_FragColor = vec4(col.rgb, 1.0); return; }
       float zn = min(z0, min(min(zl, zr), min(zu, zd)));
       float jump = max(max(abs(zl - z0), abs(zr - z0)), max(abs(zu - z0), abs(zd - z0))) / zn;
       float sil = smoothstep(uSil.x, uSil.y, jump);
@@ -230,13 +286,16 @@ export const EdgeShader = {
       float lap = max(abs(1.0 / zl + 1.0 / zr - 2.0 * w0), abs(1.0 / zu + 1.0 / zd - 2.0 * w0)) / w0;
       float crease = smoothstep(uCrease.x, uCrease.y, lap) * (1.0 - sil);
       float e = max(sil, crease * 0.75);
-      if (e < 0.02) { gl_FragColor = col; return; }
+      if (e < 0.02) { gl_FragColor = vec4(col.rgb, 1.0); return; }
       // The edge belongs to the nearer surface: find where that is in the world.
       vec2 uvn = vUv; float rn = r0;
       if (zl <= zn + 1e-4) { uvn = vUv - vec2(o.x, 0.0); rn = rl; }
       else if (zr <= zn + 1e-4) { uvn = vUv + vec2(o.x, 0.0); rn = rr; }
       else if (zu <= zn + 1e-4) { uvn = vUv + vec2(0.0, o.y); rn = ru; }
       else if (zd <= zn + 1e-4) { uvn = vUv - vec2(0.0, o.y); rn = rd; }
+      // A character (marked in alpha) draws its own ink and rim.
+      e *= smoothstep(0.62, 0.92, texture2D(tDiffuse, uvn).a);
+      if (e < 0.02) { gl_FragColor = vec4(col.rgb, 1.0); return; }
       vec4 ndc = vec4(uvn * 2.0 - 1.0, rn * 2.0 - 1.0, 1.0);
       vec4 vp = uProjInv * ndc;
       vp /= vp.w;
@@ -245,7 +304,7 @@ export const EdgeShader = {
       echoAt(wp.xz, rv, fr, tint, mem);
       float lit = max(rv * (0.4 + 0.6 * rv), max(mem.r * 0.3, mem.g * 0.05));
       vec3 line = mix(uAmber, uCream, clamp((rv - 0.7) * 2.0, 0.0, 1.0)) * lit * 1.5 + mix(uCream, tint, 0.45) * fr * 4.0;
-      gl_FragColor = vec4(col.rgb + line * e * uLine, col.a);
+      gl_FragColor = vec4(col.rgb + line * e * uLine, 1.0);
     }`,
 };
 

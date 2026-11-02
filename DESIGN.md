@@ -352,6 +352,19 @@ lantern's light. Walls facing the camera are cut down to 1 u like a dollhouse so
 slippers, striped stockings, a plum pleated skirt with a cream scalloped hem fading out above the knee, and the brass lantern swinging low in her hand. Her knife hand comes down from
 above the frame only to chop.
 
+**Characters read in any light.** The mice and the cheese keep their own colours: a little lit even in the dark, brighter
+where echoes pass but never washed to cream, a rim in the seat's colour (the cheese: orange) and a dark ink line (a shell
+just outside the mesh, the same width on screen at any zoom), so they stand out on bright floors and dark ones alike. They
+mark themselves in the frame's alpha and the echo outline pass leaves them to their own ink.
+
+**Butter** is sculpted, not stacked: a fur tube wrapped round a six-point spine every frame (deep chest, tucked waist,
+round haunches), a wide head with cheeks, whisker pads, cupped ears and the tabby M, legs whose joints are solved onto
+the floor (elbows back, knees forward, a hock) and a striped tail chain. Each mode is a pose she eases into: curled asleep
+with her tail round her nose, a play-bow stretch and a yawn to wake, sitting to listen with her ears turning, a low stalk
+with her shoulder blades rolling, a crouch with her back feet gathered and her rump wiggling, stretched out in the air
+reaching with her front paws, and a squash on landing. Her walk plants each paw (left back, left front, right back, right
+front) so they never skate.
+
 **Palette (world and UI):**
 
 | | Hex | Use |

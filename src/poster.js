@@ -130,13 +130,12 @@ function scene(name) {
     });
     const wi = sim.data.it.findIndex((it) => it.k === 'W');
     Object.assign(sim.data.it[wi], { x: wx, z: wz, by: 'm1', h: ['m2'] });
-    sim.rings.push({ kind: 'midnight', x: 1, z: 1, t: sim.now - 30, src: '' });
-    squeak(sim, 'big', sim.mice[2], 0.3);
-    squeak(sim, 'small', sim.mice[0], 0.55);
-    squeak(sim, 'small', sim.mice[1], 0.42);
+    squeak(sim, 'small', sim.mice[2], 0.62);
+    squeak(sim, 'small', sim.mice[0], 0.42);
+    squeak(sim, 'small', sim.mice[1], 0.24);
     vm = viewFromSim(sim);
     vm.focus = null;
-    aim(view, sim.world, wx - 0.6, wz - 0.5, 6.2, (58 * Math.PI) / 180);
+    aim(view, sim.world, wx - 0.7, wz - 0.6, 5.0, (58 * Math.PI) / 180);
     view.render(vm, 1 / 30);
     const wheel = view.items.find((m) => m.k === 'W');
     if (wheel) wheel.heading = heading;

@@ -4,10 +4,11 @@
 // crouch while a big one charges. Hats and fur colours from the wardrobe. No allocations in the frame.
 
 import * as THREE from 'three';
-import { patchEcho, SEAT_COLORS, PALETTE } from './echo.js';
+import { patchEcho, ink, SEAT_COLORS, PALETTE } from './echo.js';
 import { furTexture, knitTexture } from './textures.js';
 import { FURS } from '../looks.js';
 
+const PINK_RIM = 0xff8fa8;
 const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.8, metalness: 0, ...o });
 const SPH = new THREE.SphereGeometry(1, 20, 14);
 const SPH_LO = new THREE.SphereGeometry(1, 10, 7);
@@ -110,6 +111,7 @@ function makeHat(id, mats) {
   const add = (geo, mat, x, y, z, sx, sy, sz, rx = 0, rz = 0) => {
     const m = mesh(geo, mat, x, y, z, sx, sy, sz);
     m.rotation.set(rx, 0, rz);
+    if (Math.max(sx, sy, sz) >= 0.05) ink(m);
     g.add(m);
     return m;
   };
@@ -309,22 +311,22 @@ export function createMouseModel(seat = 0) {
   knitTex ??= knitTexture();
   const color = SEAT_COLORS[seat % 3];
   const mats = {
-    fur: patchEcho(std(FURS[0].color, { map: furTex, roughness: 0.95 }), { rim: 0.5, fill: 1.0, cut: false }),
-    belly: patchEcho(std(FURS[0].belly, { map: furTex, roughness: 0.95 }), { rim: 0.4, cut: false }),
-    pink: patchEcho(std(0xeaa0ae, { roughness: 0.5 }), { rim: 0.35, cut: false }),
-    inner: patchEcho(std(0xf2b4c0, { roughness: 0.6, emissive: 0x3a1018, emissiveIntensity: 0.6 }), { rim: 0.2, cut: false }),
-    scarf: patchEcho(std(color, { map: knitTex, roughness: 0.95, emissive: color, emissiveIntensity: 0.28 }), { rim: 0.45, cut: false }),
+    fur: patchEcho(std(FURS[0].color, { map: furTex, roughness: 0.95 }), { rim: 0.6, fill: 1.0, cut: false, actor: color }),
+    belly: patchEcho(std(FURS[0].belly, { map: furTex, roughness: 0.95 }), { rim: 0.45, cut: false, actor: color }),
+    pink: patchEcho(std(0xeaa0ae, { roughness: 0.5 }), { rim: 0.3, cut: false, actor: PINK_RIM }),
+    inner: patchEcho(std(0xf2b4c0, { roughness: 0.6, emissive: 0x3a1018, emissiveIntensity: 0.6 }), { rim: 0.2, cut: false, actor: PINK_RIM }),
+    scarf: patchEcho(std(color, { map: knitTex, roughness: 0.95, emissive: color, emissiveIntensity: 0.28 }), { rim: 0.45, cut: false, actor: color }),
     lens: new THREE.MeshStandardMaterial({ color: 0x050508, roughness: 0.08, metalness: 0.5, side: THREE.DoubleSide }),
     frame: std(0x0e0e12, { roughness: 0.35 }),
     gold: std(0xf0bc4c, { roughness: 0.32, metalness: 0.35, emissive: 0x5a3a00 }),
     glint: new THREE.MeshBasicMaterial({ color: PALETTE.cream, toneMapped: false }),
-    white: patchEcho(std(0xf6f2ea, { roughness: 0.9, emissive: 0x2a2826 }), { cut: false }),
-    black: patchEcho(std(0x17151c, { roughness: 0.6 }), { rim: 0.3, cut: false }),
+    white: patchEcho(std(0xf6f2ea, { roughness: 0.9, emissive: 0x2a2826 }), { rim: 0.2, cut: false, actor: PALETTE.cream }),
+    black: patchEcho(std(0x17151c, { roughness: 0.6 }), { rim: 0.3, cut: false, actor: color }),
     band: std(0xb03040, { roughness: 0.6 }),
     yolk: std(0xffd23f, { roughness: 0.6, emissive: 0x403000 }),
-    acorn: patchEcho(std(0x7a5430, { roughness: 0.9 }), { cut: false }),
+    acorn: patchEcho(std(0x7a5430, { roughness: 0.9 }), { rim: 0.2, cut: false, actor: color }),
     party: std(0x58b0e0, { roughness: 0.6, emissive: 0x0a2030 }),
-    leather: patchEcho(std(0x8a5a34, { roughness: 0.7 }), { cut: false }),
+    leather: patchEcho(std(0x8a5a34, { roughness: 0.7 }), { rim: 0.2, cut: false, actor: color }),
     wizard: std(0x40308a, { roughness: 0.7, emissive: 0x0c0820 }),
     ruby: std(0xe0203a, { roughness: 0.2, emissive: 0x400008 }),
     sapphire: std(0x3050e0, { roughness: 0.2, emissive: 0x081040 }),
@@ -337,15 +339,15 @@ export function createMouseModel(seat = 0) {
   root.add(lean);
   const body = new THREE.Group();
   lean.add(body);
-  const torso = mesh(BODY, mats.fur, 0, 0.19, 0, 1, 0.85, 1);
+  const torso = ink(mesh(BODY, mats.fur, 0, 0.19, 0, 1, 0.85, 1));
   body.add(torso);
   body.add(mesh(SPH, mats.belly, 0.0, 0.12, 0, 0.19, 0.09, 0.14, false));
   // Head on a neck pivot: a teardrop with a pointed snout, round cheeks and big cupped ears.
   const head = new THREE.Group();
   head.position.set(0.2, 0.26, 0);
   body.add(head);
-  head.add(mesh(HEAD, mats.fur, 0.0, 0, 0, 1, 0.9, 1));
-  for (const side of [-1, 1]) head.add(mesh(SPH, mats.fur, 0.05, -0.04, side * 0.07, 0.075, 0.065, 0.065, false));
+  head.add(ink(mesh(HEAD, mats.fur, 0.0, 0, 0, 1, 0.9, 1)));
+  for (const side of [-1, 1]) head.add(ink(mesh(SPH, mats.fur, 0.05, -0.04, side * 0.07, 0.075, 0.065, 0.065, false)));
   const nose = mesh(SPH_LO, mats.pink, 0.215, -0.005, 0, 0.032, 0.028, 0.034, false);
   head.add(nose);
   const ears = [];
@@ -354,7 +356,7 @@ export function createMouseModel(seat = 0) {
     ear.position.set(-0.03, 0.11, side * 0.095);
     const cup = new THREE.Group();
     cup.rotation.y = -side * 0.6;
-    cup.add(mesh(SPH, mats.fur, 0, 0.1, 0, 0.032, 0.125, 0.115));
+    cup.add(ink(mesh(SPH, mats.fur, 0, 0.1, 0, 0.032, 0.125, 0.115)));
     cup.add(mesh(SPH, mats.inner, 0.02, 0.1, 0, 0.014, 0.095, 0.085, false));
     ear.add(cup);
     ear.rotation.set(side * 0.35, 0, 0.2);
@@ -395,7 +397,7 @@ export function createMouseModel(seat = 0) {
   const loop = new THREE.Mesh(new THREE.TorusGeometry(0.135, 0.045, 8, 22), mats.scarf);
   loop.rotation.y = Math.PI / 2;
   loop.castShadow = true;
-  scarf.add(loop);
+  scarf.add(ink(loop));
   body.add(scarf);
   const scarfEnd = new THREE.Group();
   scarfEnd.position.set(0.06, 0.2, 0.12);
@@ -430,6 +432,7 @@ export function createMouseModel(seat = 0) {
   body.add(stars);
   // The tail (world space) and the one that flies off.
   const tail = createTail(mats.pink);
+  ink(tail.mesh);
   const flyer = new THREE.Group();
   flyer.visible = false;
   const fcurve = new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0, 0), new THREE.Vector3(-0.2, 0.05, 0.08), new THREE.Vector3(-0.45, 0.02, 0.0), new THREE.Vector3(-0.65, 0.06, -0.1)]);

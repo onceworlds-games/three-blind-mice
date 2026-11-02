@@ -7,7 +7,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
-import { EdgeShader } from './echo.js';
+import { EdgeShader, echo } from './echo.js';
 
 class EdgePass extends Pass {
   constructor(camera) {
@@ -91,6 +91,8 @@ class GradePass extends Pass {
 }
 
 export function createPost(renderer, scene, camera, quality) {
+  // The characters mark themselves in the scene's alpha for the outline pass.
+  echo.uMark.value = 0.5;
   const samples = quality === 'high' ? 4 : 0;
   const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples });
   target.depthTexture = new THREE.DepthTexture(1, 1);

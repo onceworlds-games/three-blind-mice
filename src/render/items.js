@@ -2,11 +2,14 @@
 // spring traps (Poly Haven's mousetrap with a working kill bar and bait) and the crumbs only a squeak shows.
 
 import * as THREE from 'three';
-import { patchEcho, PALETTE } from './echo.js';
+import { patchEcho, ink, PALETTE } from './echo.js';
 import { cheeseTexture, stencilTexture } from './textures.js';
 import { propParts } from './assets.js';
 import { decal, glowTexture } from './mouse.js';
 
+// The cheese keeps its yellow in any light: an orange rim and a dark rind line round it.
+const CHEESE_RIM = 0xff9a1e;
+const CHEESE_INK = 0x241004;
 const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0, ...o });
 
 let cheeseMats = null;
@@ -14,8 +17,8 @@ function cheese() {
   if (cheeseMats) return cheeseMats;
   const tex = cheeseTexture();
   cheeseMats = {
-    paste: () => patchEcho(new THREE.MeshStandardMaterial({ color: 0xffffff, map: tex, bumpMap: tex, bumpScale: 2, roughness: 0.55, emissive: PALETTE.cheese, emissiveIntensity: 0.12 }), { rim: 0.4, cut: false }),
-    rind: () => patchEcho(std(0xe4a42c, { roughness: 0.5, emissive: PALETTE.cheese, emissiveIntensity: 0.1 }), { rim: 0.4, cut: false }),
+    paste: () => patchEcho(new THREE.MeshStandardMaterial({ color: 0xffffff, map: tex, bumpMap: tex, bumpScale: 2, roughness: 0.55, emissive: PALETTE.cheese, emissiveIntensity: 0.12 }), { rim: 0.45, fill: 0.7, cut: false, actor: CHEESE_RIM }),
+    rind: () => patchEcho(std(0xe4a42c, { roughness: 0.5, emissive: PALETTE.cheese, emissiveIntensity: 0.1 }), { rim: 0.45, fill: 0.7, cut: false, actor: CHEESE_RIM }),
   };
   return cheeseMats;
 }
@@ -36,7 +39,7 @@ export function createWedge() {
   g.rotateY(Math.PI);
   const paste = cheese().paste();
   const rind = cheese().rind();
-  const m = new THREE.Mesh(g, paste);
+  const m = ink(new THREE.Mesh(g, paste), CHEESE_INK);
   m.castShadow = true;
   // The rind: a thin curved band on the round side.
   const band = new THREE.Mesh(new THREE.CylinderGeometry(R + 0.02, R + 0.02, H + 0.03, 12, 1, true, (Math.PI * 3) / 2 - A / 2, A), rind);
@@ -73,7 +76,7 @@ export function createWheel() {
   const rind = cheese().rind();
   const face = cheese().paste();
   const g = new THREE.CylinderGeometry(0.62, 0.62, 0.44, 36, 1, false);
-  const m = new THREE.Mesh(g, [rind, face, face]);
+  const m = ink(new THREE.Mesh(g, [rind, face, face]), CHEESE_INK);
   m.castShadow = true;
   m.rotation.x = Math.PI / 2;
   // Bevel rings at both edges.
@@ -83,7 +86,7 @@ export function createWheel() {
     ring.position.y = y;
     m.add(ring);
   }
-  const label = new THREE.Mesh(new THREE.CircleGeometry(0.3, 24), patchEcho(new THREE.MeshStandardMaterial({ map: stencilTexture('CHEDDAR', '#7a2a1a'), color: 0xf4ead4, roughness: 0.9, transparent: true }), { cut: false }));
+  const label = new THREE.Mesh(new THREE.CircleGeometry(0.3, 24), patchEcho(new THREE.MeshStandardMaterial({ map: stencilTexture('CHEDDAR', '#7a2a1a'), color: 0xf4ead4, roughness: 0.9, transparent: true }), { rim: 0.1, cut: false, actor: CHEESE_RIM }));
   const roll = new THREE.Group();
   roll.position.y = 0.62;
   roll.add(m);
@@ -237,7 +240,7 @@ export function createCrumbs(list) {
         const dx = list[i][0] - fx;
         const dz = list[i][1] - fz;
         const near = Math.max(0, 1 - Math.sqrt(dx * dx + dz * dz) / 1.9);
-        const want = glints[i] * 1.5 + Math.max(known[i] * 0.42, near * 0.7);
+        const want = glints[i] * 0.9 + Math.max(known[i] * 0.4, near * 0.65);
         if (Math.abs(want - shown[i]) > 0.01) {
           shown[i] = want;
           const g = want;
