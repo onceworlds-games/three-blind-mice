@@ -67,9 +67,9 @@
     top: 49%;
   }
 }
-#title .tside {
+#lobby .tside {
   position: absolute;
-  right: 20px;
+  left: 20px;
   bottom: calc(var(--bot) + 18px);
   display: flex;
   gap: 12px;
@@ -246,7 +246,7 @@
     top: 50%;
     gap: 12px;
   }
-  #title .tside {
+  #lobby .tside {
     left: 12px;
     right: 12px;
     bottom: calc(var(--bot) + 10px);
@@ -311,7 +311,7 @@
     flex-direction: column;
     align-items: flex-start;
   }
-  #title .tside {
+  #lobby .tside {
     bottom: calc(var(--bot) + 8px);
     right: 12px;
     width: 300px;
@@ -1143,4 +1143,12 @@
   #results .medalrow.on .mbig {
     animation: none;
   }
+}
+
+/* The streak sits beside the level chip in the lobby. */
+#lobby .lobbystreak {
+  position: absolute;
+  left: 228px;
+  top: calc(var(--top-l) + 90px);
+  pointer-events: none;
 }

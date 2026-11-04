@@ -137,7 +137,8 @@ async function boot() {
     .catch(showError);
 
   // ------------------------------------------------------------ screens
-  let screen = 'title';
+  // Players land straight in the lobby (the platform's strip is the only Play). The title exists only for local captures.
+  let screen = AUTO ? 'title' : 'game';
   let shownPhase = '';
   const ui = createUI({
     sfx: (n, o) => {
@@ -145,8 +146,6 @@ async function boot() {
       if ((n === 'medal' && o?.n) || n === 'levelup' || n === 'unlock') view.cheer();
     },
     reduced,
-    onPlay: () => play(),
-    onRaid: () => play(true),
     onPick: (n, raid) => (raid ? session?.setPick(0, today()) : session?.setPick(n)),
     onWardrobe: (on) => setWardrobe(on),
     onWear: (kind, id) => wear(kind, id),
@@ -158,8 +157,17 @@ async function boot() {
     onJoinIn: () => session?.joinIn(),
   });
   refreshTitle();
-  ui.show('title');
-  document.body.dataset.flow = 'title';
+  ui.show(AUTO ? 'title' : '');
+  document.body.dataset.flow = AUTO ? 'title' : 'lobby';
+  // Sound starts on the first press or key.
+  const wake = () => {
+    removeEventListener('pointerdown', wake, true);
+    removeEventListener('keydown', wake, true);
+    audio.start();
+    audio.music('menu');
+  };
+  addEventListener('pointerdown', wake, true);
+  addEventListener('keydown', wake, true);
   safe(() => ow?.ui?.setLook?.({ accent: '#F4A835', panel: '#14131F', text: '#FFF1D6' }));
   safe(() => ui.layout((ow && ow.ui && ow.ui.reserved) || null));
   safe(() => ow?.on?.('reserved', (a) => ui.layout(a)));
@@ -260,8 +268,7 @@ async function boot() {
   function play(raid = false) {
     audio.start();
     audio.music('menu');
-    const r = (raid ? ui.raidButton : ui.playButton).getBoundingClientRect();
-    ui.wipe(((r.left + r.width / 2) / window.innerWidth) * 100, ((r.top + r.height / 2) / window.innerHeight) * 100);
+    ui.wipe(50, 50);
     screen = 'game';
     view.snapCamera();
     // The Daily Raid: alone, straight in; with friends, it's the lobby's pick.
@@ -310,14 +317,7 @@ async function boot() {
   addEventListener('blur', () => keys.clear());
 
   function onKey(k, e) {
-    if (screen === 'title') {
-      if (k === ' ' || k === 'Enter') {
-        e.preventDefault();
-        play();
-      }
-      if (k === 'd') play(true);
-      return;
-    }
+    if (screen === 'title') return;
     if (!session) return;
     const phase = session.phase;
     if (pausedBand) {

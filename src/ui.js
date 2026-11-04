@@ -143,28 +143,19 @@ export function createUI(h) {
   const tName = el('div', 'name slab lit', screens.title);
   tName.innerHTML = '<span>Three </span><span>Blind </span><span>Mice</span>';
   const tRow = el('div', 'row', screens.title);
-  const playBtn = press(el('button', 'btn big pulse', tRow, 'Play'), () => h.onPlay());
   const tMeta = el('div', 'tmeta', tRow);
   const tLevel = levelChip(tMeta);
   const tStreak = el('div', 'streak', tMeta);
-  const tSide = el('div', 'tside', screens.title);
-  const tDaily = el('div', 'daily', tSide);
-  tDaily.innerHTML = `<div class="dh">${raidSvg(30)}<b class="slab">Daily Raid</b></div><div class="dn slab"></div><div class="dt"></div><div class="dtop"></div>`;
-  const raidBtn = press(el('button', 'btn', tDaily), () => h.onRaid());
-  raidBtn.innerHTML = 'Raid<span class="key">D</span>';
+  // The streak and today's goals live on the lobby screen; the Daily Raid is the lobby's Daily tile.
+  const tSide = el('div', 'tside', screens.lobby);
   const tGoals = el('div', 'goals', tSide);
+  tStreak.classList.add('lobbystreak');
+  screens.lobby.append(tStreak);
   ui.title = (s) => {
     tLevel.set(s.level, s.into, s.need);
     tStreak.innerHTML = `${flameSvg(s.streak > 0, 26)}<span class="slab">${s.streak}</span>`;
     tStreak.title = s.streak ? `${s.streak} day${s.streak === 1 ? '' : 's'} in a row` : 'Play today to start a streak';
     tStreak.classList.toggle('cold', !s.streak);
-    const d = s.daily;
-    tDaily.style.display = d ? '' : 'none';
-    if (d) {
-      tDaily.querySelector('.dn').textContent = d.name;
-      tDaily.querySelector('.dt').innerHTML = `<span class="tw">${esc(d.twist)}</span>${d.best ? `<span>Yours <b>${num(d.best)}</b></span>` : ''}`;
-      tDaily.querySelector('.dtop').innerHTML = d.top.length ? boardRows(d.top.slice(0, 3)) : `<div class="none">${d.raiders ? `${num(d.raiders)} raided today` : 'Nobody yet today'}</div>`;
-    }
     tGoals.innerHTML = s.goals.length ? `<div class="gh"><b class="slab">Today</b>${s.allDone ? `<span>${CHECK}</span>` : ''}</div>${s.goals.map((g) => goalRow(g)).join('')}${s.week ? `<div class="gh wkh"><b class="slab">This week</b><span class="xpv">+600 XP</span></div>${goalRow(s.week)}` : ''}` : '';
     tGoals.style.display = s.goals.length ? '' : 'none';
   };
@@ -172,8 +163,6 @@ export function createUI(h) {
     tName.style.setProperty('--rx', `${x}%`);
     tName.style.setProperty('--rr', `${r}%`);
   };
-  ui.playButton = playBtn;
-  ui.raidButton = raidBtn;
 
   // ------------------------------------------------------------ lobby
   const strip = el('div', 'strip tap', screens.lobby);
