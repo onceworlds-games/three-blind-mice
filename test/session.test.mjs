@@ -16,6 +16,11 @@ function table() {
     const room = hub.join(id, id.toUpperCase());
     const s = createSession({ room, createMatch, createHost, t, introSeconds: 0.2, firstPick, unlocked: () => 12 });
     s.input = {};
+    // What the platform's strip does: ready, and the host's Start.
+    s.ready = (on) => room.setReady(on);
+    s.start = () => {
+      if (room.canStart) room.startMatch();
+    };
     pages.set(id, s);
     return s;
   };

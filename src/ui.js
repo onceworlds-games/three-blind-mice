@@ -193,10 +193,6 @@ export function createUI(h) {
   const cMeta = el('div', 'meta', card);
   const cMedals = el('div', 'medals', card);
   const cBoard = el('div', 'board', card);
-  const cAct = el('div', 'wait', card);
-  const startBtn = press(el('button', 'btn big'), () => h.onStart());
-  const readyBtn = press(el('button', 'btn big'), () => h.onReady());
-  const waitTxt = el('span', 'solid');
   const lLevel = levelChip(screens.lobby, 'button');
   lLevel.el.classList.add('lobbylv');
   press(lLevel.el, () => h.onWardrobe(true));
@@ -243,28 +239,6 @@ export function createUI(h) {
       cMedals.innerHTML = s.thresholds ? s.thresholds.map((v, k) => `<span class="${md >= k + 1 ? 'got' : ''}">${medalSvg(k + 1, 15)}${num(v)}</span>`).join('') : '';
       cBoard.innerHTML = '';
     }
-    cAct.textContent = '';
-    if (s.isHost) {
-      startBtn.innerHTML = `${raid ? 'Raid' : 'Start'}<span class="key">Enter</span>`;
-      startBtn.disabled = !s.canStart;
-      cAct.appendChild(startBtn);
-      if (!s.canStart && s.waitingFor.length) {
-        waitTxt.textContent = `Waiting for ${s.waitingFor.join(', ')}`;
-        cAct.prepend(waitTxt);
-        waitTxt.style.marginRight = '14px';
-      }
-    } else if (!s.ready) {
-      readyBtn.innerHTML = `Ready<span class="key">Enter</span>`;
-      cAct.appendChild(readyBtn);
-    } else {
-      waitTxt.textContent = `Ready. Waiting for ${s.hostName}`;
-      waitTxt.style.marginRight = '0';
-      const undo = press(el('button', 'btn quiet'), () => h.onReady());
-      undo.textContent = 'Not ready';
-      cAct.appendChild(waitTxt);
-      cAct.appendChild(undo);
-      undo.style.marginLeft = '12px';
-    }
     party.textContent = '';
     for (let i = 0; i < 3; i++) {
       const p = s.seats[i];
@@ -283,7 +257,6 @@ export function createUI(h) {
         const tag = el('i', '', who);
         tag.innerHTML = seatSvg(i, 14);
         tag.append(p.me ? ' Wardrobe' : p.host ? ' Host' : ' Mouse');
-        if (p.ready || p.host) el('div', 'ok', seat).innerHTML = CHECK;
         if (p.me) {
           seat.title = 'Wardrobe';
           press(seat, () => h.onWardrobe(true));

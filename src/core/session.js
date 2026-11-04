@@ -308,22 +308,18 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
     room.clearReady?.();
     return true;
   };
-  s.ready = (on) => room.setReady(on);
-  s.start = () => {
-    if (room.canStart) room.startMatch({ countdown: 0 });
-  };
   // The title's one button, alone with nothing played yet: straight into Night 1.
   s.quickStart = (n = 1) => {
     if (room.match.phase !== 'lobby' || !room.isHost || room.online.length > 1) return false;
     pickState.set({ n: Math.max(1, Math.min(NIGHT_COUNT, n)) });
-    room.startMatch({ countdown: 0 });
+    room.startMatch();
     return true;
   };
   // Alone at the title: straight into today's Daily Raid.
   s.quickRaid = (day) => {
     if (room.match.phase !== 'lobby' || !room.isHost || room.online.length > 1 || !dailyNight(day)) return false;
     pickState.set({ n: dailyNight(day).id, dy: day });
-    room.startMatch({ countdown: 0 });
+    room.startMatch();
     return true;
   };
   // Results: the host picks what's next. Alone it also starts at once.
@@ -332,7 +328,7 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
     const want = Math.max(1, Math.min(NIGHT_COUNT, n));
     if (validDay(dy) && dailyNight(dy)) pickState.set({ n: dailyNight(dy).id, dy });
     else pickState.set({ n: Math.min(want, Math.max(unlocked(), 1)) });
-    s.autoStart = room.online.length <= 1;
+    s.autoStart = false;
     room.endMatch();
   };
   s.toMap = () => {
@@ -493,7 +489,7 @@ export function createSession({ room, createMatch, createHost, t, introSeconds =
       s.hunters = [];
       if (s.autoStart && room.isHost && room.canStart) {
         s.autoStart = false;
-        room.startMatch({ countdown: 0 });
+        room.startMatch();
       }
       s.pausedByMe = false;
     }

@@ -99,7 +99,7 @@ async function boot() {
   const reduced = () => view.reduced;
 
   // ------------------------------------------------------------ the room, joined as the page loads
-  const JOIN = { private: true, maxPlayers: 3, minPlayers: 1, lobby: 'game', countdown: 0 };
+  const JOIN = { private: true, maxPlayers: 3, minPlayers: 1, lobby: 'bar' };
   async function join() {
     if (ow?.rooms?.join && !(AUTO && q.get('mice'))) {
       try {
@@ -119,10 +119,14 @@ async function boot() {
     session = createSession({ room, createMatch, createHost, t, unlocked: () => Math.max(unlockedNights(progress), ENV_NIGHT), look: () => progress.look, firstPick: ENV_NIGHT || 1 });
     if (wantRaid) {
       wantRaid = false;
-      if (!session.quickRaid(today())) session.setPick(0, today());
+      if (!(AUTO && session.quickRaid(today()))) session.setPick(0, today());
     }
     session.match.on('results', () => onResults());
     room.on('close', (reason) => onClosed(reason));
+    room.on('matchstart', () => {
+      if (dressing) setWardrobe(false);
+      if (pausedBand) resume();
+    });
   }
   join()
     .then((r) => {
@@ -147,8 +151,6 @@ async function boot() {
     onWardrobe: (on) => setWardrobe(on),
     onWear: (kind, id) => wear(kind, id),
     onTry: (kind, id) => tryOn(kind, id),
-    onReady: () => session?.ready(!room.me?.ready),
-    onStart: () => session?.start(),
     onInvite: () => safe(() => ow?.ui?.showInvite?.()),
     onNext: () => resultsAction('next'),
     onAgain: () => resultsAction('again'),
@@ -264,15 +266,15 @@ async function boot() {
     view.snapCamera();
     // The Daily Raid: alone, straight in; with friends, it's the lobby's pick.
     if (raid) {
-      if (session && room.match.phase === 'lobby' && room.isHost && room.online.length <= 1) session.quickRaid(today());
+      if (AUTO && session && room.match.phase === 'lobby' && room.isHost && room.online.length <= 1) session.quickRaid(today());
       else if (session && room.isHost) session.setPick(0, today());
       else if (!session) wantRaid = true;
       return;
     }
-    // Alone with nothing played yet: straight into Night 1. Anyone else lands in the lobby (or watches a night under way).
+    // Everyone lands in the lobby: the platform's Ready starts the night. Only local captures start by themselves.
     if (AUTO_TO === 'lobby') return;
     const want = AUTO ? Number(q.get('night')) || ENV_NIGHT || 1 : ENV_NIGHT || 1;
-    if ((totalStars(progress) === 0 && !import.meta.env?.VITE_LOBBY) || AUTO) {
+    if (AUTO) {
       if (session) quick(want);
       else wantQuick = want;
     }
@@ -324,10 +326,9 @@ async function boot() {
     }
     if (phase === 'lobby') {
       if (dressing) {
-        if (k === 'Escape' || k === 'Enter' || k === 'g') setWardrobe(false);
+        if (k === 'Escape' || k === 'g') setWardrobe(false);
         return;
       }
-      if (k === 'Enter') room.isHost ? session.start() : session.ready(!room.me?.ready);
       if (k === 'g') setWardrobe(true);
       if (k === 'd' && room.isHost) session.setPick(0, today());
       if (room.isHost && (k === 'ArrowLeft' || k === 'ArrowRight')) session.setPick(session.pickDay() ? 1 : session.pick() + (k === 'ArrowLeft' ? -1 : 1));
