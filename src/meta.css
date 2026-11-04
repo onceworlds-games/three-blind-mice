@@ -1152,3 +1152,11 @@
   top: calc(var(--top-l) + 90px);
   pointer-events: none;
 }
+
+/* Phones and short screens: no room for the streak or goals beside the lobby's own controls. */
+@media (max-aspect-ratio: 1/1), (max-height: 500px) {
+  #lobby .lobbystreak,
+  #lobby .tside {
+    display: none;
+  }
+}
